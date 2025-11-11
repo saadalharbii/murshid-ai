@@ -1,0 +1,10 @@
+BEGIN:VCARD 
+VERSION:3.0 
+PRODID:-//Apple Inc.//iPhone OS 13.3.1//EN 
+N:الثقافية;الملحقية;;; 
+FN:الملحقية الثقافية 
+item1.TEL;type=pref:+44 20 3249 7000 
+item1.X-ABLabel:Mobile 
+item2.TEL:+44 20 3249 7114 
+item2.X-ABLabel:Mobile 
+END:VCARD 

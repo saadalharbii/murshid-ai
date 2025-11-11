@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pip install:*)",
+      "Bash(python scripts/ingest_telegram.py:*)",
+      "Bash(pip uninstall:*)",
+      "Bash(timeout 300 python scripts/ingest_telegram.py:*)",
+      "Bash(tee:*)",
+      "Bash(python -m uvicorn:*)",
+      "Bash(python -m streamlit:*)",
+      "Bash(curl:*)",
+      "Bash(timeout 10 bash:*)",
+      "Bash(python test_api.py:*)",
+      "Bash(timeout 30 bash:*)",
+      "Bash(python test_queries.py:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

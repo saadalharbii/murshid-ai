@@ -1,0 +1,9 @@
+BEGIN:VCARD 
+VERSION:3.0 
+PRODID:-//Apple Inc.//iPhone OS 18.1.1//EN 
+N:بريطانيا;الخطوط السعودية;المبتعثين;; 
+FN:الخطوط السعودية المبتعثين بريطانيا 
+item1.EMAIL;type=INTERNET;type=pref:studentscare@saudia.com 
+item1.X-ABLabel:INTERNET 
+TEL;type=WORK;type=VOICE;type=pref:+442084356619 
+END:VCARD 
