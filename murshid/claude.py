@@ -33,14 +33,14 @@ def _ssl_context() -> ssl.SSLContext:
         return ssl.create_default_context()
 
 
-def complete(
+def stream(
     prompt: str,
     system: str,
     model: str | None = None,
     max_tokens: int = 1024,
     timeout: float = 60.0,
-) -> str:
-    """Send one message and return Claude's text reply."""
+):
+    """Yield Claude's reply incrementally, so callers can render as it arrives."""
     if not config.ANTHROPIC_API_KEY:
         raise ClaudeError("ANTHROPIC_API_KEY is not set. Add it to .env.")
 
@@ -50,6 +50,7 @@ def complete(
             "max_tokens": max_tokens,
             "system": system,
             "messages": [{"role": "user", "content": prompt}],
+            "stream": True,
         }
     ).encode()
 
@@ -63,33 +64,24 @@ def complete(
         },
     )
 
-    for attempt in range(4):
-        try:
-            with urllib.request.urlopen(request, timeout=timeout, context=_ssl_context()) as response:
-                body = json.load(response)
-            break
-        except urllib.error.HTTPError as exc:
-            # Rate limits and server faults are transient; the request is fine.
-            if (exc.code == 429 or exc.code >= 500) and attempt < 3:
-                time.sleep(2.0 * (attempt + 1))
-                continue
-            if exc.code == 401:
-                raise ClaudeError("The API key was rejected.") from exc
-            if exc.code == 429:
-                raise ClaudeError("Too many requests right now. Please try again shortly.") from exc
-            if exc.code == 400 and b"credit" in exc.read().lower():
-                raise ClaudeError("The API account is out of credit.") from exc
-            raise ClaudeError(
-                f"The language model returned an error ({exc.code}). Please try again."
-            ) from exc
-        except (urllib.error.URLError, TimeoutError) as exc:
-            if attempt < 3:
-                time.sleep(2.0 * (attempt + 1))
-                continue
-            raise ClaudeError("Could not reach the language model.") from exc
-    else:
-        raise ClaudeError("The language model is busy. Please try again in a moment.")
-
-    return "".join(
-        block.get("text", "") for block in body.get("content", []) if block.get("type") == "text"
-    ).strip()
+    try:
+        with urllib.request.urlopen(request, timeout=timeout, context=_ssl_context()) as response:
+            for raw in response:
+                line = raw.decode("utf-8", "replace").strip()
+                if not line.startswith("data:"):
+                    continue
+                event = json.loads(line[5:].strip())
+                if event.get("type") == "content_block_delta":
+                    text = event.get("delta", {}).get("text")
+                    if text:
+                        yield text
+    except urllib.error.HTTPError as exc:
+        if exc.code == 401:
+            raise ClaudeError("The API key was rejected.") from exc
+        if exc.code == 429:
+            raise ClaudeError("Too many requests right now. Please try again shortly.") from exc
+        raise ClaudeError(
+            f"The language model returned an error ({exc.code}). Please try again."
+        ) from exc
+    except (urllib.error.URLError, TimeoutError) as exc:
+        raise ClaudeError("Could not reach the language model.") from exc

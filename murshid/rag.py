@@ -3,11 +3,9 @@
 from __future__ import annotations
 
 import re
-import time
-from dataclasses import dataclass, field
 
 from . import config
-from .claude import ClaudeError, complete
+from .claude import stream
 from .embeddings import EmbeddingError, embed_query
 from .store import Document, VectorStore
 
@@ -32,21 +30,6 @@ Instructions:
 3. The source is student chatter, not an official body - flag this on official matters
 4. Answer in English, and keep it concise and practical"""
 
-_NO_CONTEXT_AR = "لم أجد في أرشيف المجموعات ما يجيب على سؤالك. جرّب صياغة أخرى."
-_NO_CONTEXT_EN = (
-    "I couldn't find anything in the group archive that answers that. "
-    "Try rephrasing your question."
-)
-
-
-@dataclass
-class Answer:
-    """The result of one question, including what it was based on."""
-
-    text: str
-    language: str
-    sources: list[Document] = field(default_factory=list)
-    elapsed: float = 0.0
 
 
 def detect_language(text: str) -> str:
@@ -78,33 +61,25 @@ class RAGPipeline:
             return f"مقتطفات من نقاشات الطلاب:\n\n{context}\n\nالسؤال: {question}"
         return f"Excerpts from student discussions:\n\n{context}\n\nQuestion: {question}"
 
-    def answer(self, question: str) -> Answer:
-        """Answer a question, returning the text plus the sources used."""
-        started = time.time()
+    def retrieve(self, question: str) -> tuple[str, list[Document], str | None]:
+        """Detect language and fetch context. Returns (language, sources, error)."""
         language = detect_language(question)
 
         try:
             query_vector = embed_query(question)
         except EmbeddingError as exc:
-            return Answer(f"Retrieval is unavailable: {exc}", language, [], time.time() - started)
+            return language, [], str(exc)
 
         sources = self.store.search(
             query_vector,
             top_k=config.TOP_K_RESULTS,
             threshold=config.SIMILARITY_THRESHOLD,
         )
+        return language, sources, None
 
-        if not sources:
-            message = _NO_CONTEXT_AR if language == "arabic" else _NO_CONTEXT_EN
-            return Answer(message, language, [], time.time() - started)
-
-        try:
-            text = complete(
-                prompt=self._build_prompt(question, sources, language),
-                system=_SYSTEM_AR if language == "arabic" else _SYSTEM_EN,
-            )
-        except ClaudeError as exc:
-            return Answer(f"Could not generate an answer: {exc}", language, sources,
-                          time.time() - started)
-
-        return Answer(text, language, sources, time.time() - started)
+    def stream_answer(self, question: str, language: str, sources: list[Document]):
+        """Yield the answer in chunks as Claude generates it."""
+        yield from stream(
+            prompt=self._build_prompt(question, sources, language),
+            system=_SYSTEM_AR if language == "arabic" else _SYSTEM_EN,
+        )
