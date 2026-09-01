@@ -33,6 +33,15 @@ st.markdown(
         font-size: 0.87rem;
       }
       .source-meta { opacity: 0.65; font-size: 0.78rem; margin-top: 0.4rem; }
+
+      /* Bidirectional text. `plaintext` makes the browser pick each
+         paragraph's direction from its first strong character, so Arabic
+         containing English (e.g. "QS Ranking") stays laid out correctly
+         instead of the Latin run flipping the surrounding text. */
+      .rtl, .rtl * { direction: rtl; text-align: right; }
+      .ltr, .ltr * { direction: ltr; text-align: left; }
+      .rtl p, .rtl li, .ltr p, .ltr li { unicode-bidi: plaintext; }
+      .source-card { unicode-bidi: plaintext; }
     </style>
     """,
     unsafe_allow_html=True,
@@ -43,6 +52,12 @@ st.markdown(
 def load_pipeline() -> RAGPipeline:
     """Build the pipeline once per server process."""
     return RAGPipeline()
+
+
+def render_directional(text: str, language: str) -> None:
+    """Render text with the correct base direction for its language."""
+    css_class = "rtl" if language == "arabic" else "ltr"
+    st.markdown(f'<div class="{css_class}">\n\n{text}\n\n</div>', unsafe_allow_html=True)
 
 
 def render_sources(sources) -> None:
@@ -109,16 +124,21 @@ def main() -> None:
 
     for message in st.session_state.messages:
         with st.chat_message(message["role"]):
-            st.markdown(message["content"])
+            render_directional(message["content"], message.get("language", "english"))
             if message["role"] == "assistant":
                 render_sources(message.get("sources", []))
 
     question = st.chat_input("Ask in Arabic or English...") or st.session_state.pop("pending", None)
 
     if question:
-        st.session_state.messages.append({"role": "user", "content": question})
+        from murshid.rag import detect_language
+
+        question_language = detect_language(question)
+        st.session_state.messages.append(
+            {"role": "user", "content": question, "language": question_language}
+        )
         with st.chat_message("user"):
-            st.markdown(question)
+            render_directional(question, question_language)
 
         with st.chat_message("assistant"):
             with st.spinner("Searching the archive..."):
@@ -128,12 +148,17 @@ def main() -> None:
                     st.error(f"Something went wrong: {exc}")
                     st.stop()
 
-            st.markdown(answer.text)
+            render_directional(answer.text, answer.language)
             render_sources(answer.sources)
             st.caption(f"{answer.elapsed:.1f}s · {answer.language}")
 
         st.session_state.messages.append(
-            {"role": "assistant", "content": answer.text, "sources": answer.sources}
+            {
+                "role": "assistant",
+                "content": answer.text,
+                "sources": answer.sources,
+                "language": answer.language,
+            }
         )
 
 
