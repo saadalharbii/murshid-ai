@@ -1,0 +1,3 @@
+# Sample Telegram export data - not project source code.
+# Prevents GitHub's language stats from labeling this an HTML repo.
+ChatExport_*/** linguist-vendored
