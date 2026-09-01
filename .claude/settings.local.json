@@ -12,7 +12,20 @@
       "Bash(timeout 10 bash:*)",
       "Bash(python test_api.py:*)",
       "Bash(timeout 30 bash:*)",
-      "Bash(python test_queries.py:*)"
+      "Bash(python test_queries.py:*)",
+      "Bash(python3 -c \"import fastapi, anthropic, supabase, sentence_transformers; print\\('all importable'\\)\")",
+      "Bash(python3 *)",
+      "Skill(claude-api)",
+      "Bash(env)",
+      "Bash(ant auth *)",
+      "Bash(.venv/bin/python -m pip install --quiet --upgrade pip)",
+      "Bash(.venv/bin/python --version)",
+      "Bash(.venv/bin/pip install *)",
+      "Bash(.venv/bin/python -c \"import bs4, lxml, loguru; print\\('parser deps ok'\\)\")",
+      "Bash(timeout 100 ../../.venv/bin/python -c ' *)",
+      "Bash(../../.venv/bin/python -c ' *)",
+      "Bash(grep -viE '^\\\\s*$')",
+      "Bash(git ls-tree *)"
     ],
     "deny": [],
     "ask": []
