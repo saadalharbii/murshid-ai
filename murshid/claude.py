@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import ssl
+import time
 import urllib.error
 import urllib.request
 
@@ -62,18 +63,32 @@ def complete(
         },
     )
 
-    try:
-        with urllib.request.urlopen(request, timeout=timeout, context=_ssl_context()) as response:
-            body = json.load(response)
-    except urllib.error.HTTPError as exc:
-        detail = exc.read().decode("utf-8", "replace")[:300]
-        if exc.code == 401:
-            raise ClaudeError("Anthropic rejected the API key (401).") from exc
-        if exc.code == 429:
-            raise ClaudeError("Rate limited by the Anthropic API (429).") from exc
-        raise ClaudeError(f"Anthropic API error {exc.code}: {detail}") from exc
-    except urllib.error.URLError as exc:
-        raise ClaudeError(f"Could not reach the Anthropic API: {exc.reason}") from exc
+    for attempt in range(4):
+        try:
+            with urllib.request.urlopen(request, timeout=timeout, context=_ssl_context()) as response:
+                body = json.load(response)
+            break
+        except urllib.error.HTTPError as exc:
+            # Rate limits and server faults are transient; the request is fine.
+            if (exc.code == 429 or exc.code >= 500) and attempt < 3:
+                time.sleep(2.0 * (attempt + 1))
+                continue
+            if exc.code == 401:
+                raise ClaudeError("The API key was rejected.") from exc
+            if exc.code == 429:
+                raise ClaudeError("Too many requests right now. Please try again shortly.") from exc
+            if exc.code == 400 and b"credit" in exc.read().lower():
+                raise ClaudeError("The API account is out of credit.") from exc
+            raise ClaudeError(
+                f"The language model returned an error ({exc.code}). Please try again."
+            ) from exc
+        except (urllib.error.URLError, TimeoutError) as exc:
+            if attempt < 3:
+                time.sleep(2.0 * (attempt + 1))
+                continue
+            raise ClaudeError("Could not reach the language model.") from exc
+    else:
+        raise ClaudeError("The language model is busy. Please try again in a moment.")
 
     return "".join(
         block.get("text", "") for block in body.get("content", []) if block.get("type") == "text"

@@ -67,16 +67,24 @@ def _post(texts: list[str], input_type: str, timeout: float) -> list[list[float]
                 body = json.load(response)
             return [item["embedding"] for item in body["data"]]
         except urllib.error.HTTPError as exc:
-            if exc.code == 429 and attempt < 5:
-                # Rate limited: back off and retry rather than losing the run.
-                time.sleep(_FREE_TIER_DELAY * (attempt + 1))
+            # 429 is the free tier's rate limit; 5xx are transient server faults.
+            # Both are worth retrying - the request itself is fine.
+            if (exc.code == 429 or exc.code >= 500) and attempt < 5:
+                delay = _FREE_TIER_DELAY if exc.code == 429 else 2.0
+                time.sleep(delay * (attempt + 1))
                 continue
-            detail = exc.read().decode("utf-8", "replace")[:200]
-            raise EmbeddingError(f"Voyage API error {exc.code}: {detail}") from exc
-        except urllib.error.URLError as exc:
-            raise EmbeddingError(f"Could not reach Voyage API: {exc.reason}") from exc
+            if exc.code == 401:
+                raise EmbeddingError("Voyage rejected the API key.") from exc
+            raise EmbeddingError(
+                f"The embedding service returned an error ({exc.code}). Please try again."
+            ) from exc
+        except (urllib.error.URLError, TimeoutError) as exc:
+            if attempt < 5:
+                time.sleep(2.0 * (attempt + 1))
+                continue
+            raise EmbeddingError("Could not reach the embedding service.") from exc
 
-    raise EmbeddingError("Voyage API rate limit exceeded after several retries")
+    raise EmbeddingError("The embedding service is busy. Please try again in a moment.")
 
 
 def embed_query(text: str, timeout: float = 30.0) -> list[float]:
