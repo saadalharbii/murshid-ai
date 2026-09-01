@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import streamlit as st
 
-from murshid import config
+from murshid import __version__, config
 from murshid.rag import RAGPipeline, detect_language
 
 EXAMPLES = [
@@ -42,8 +42,13 @@ st.markdown(
 
 
 @st.cache_resource(show_spinner="Loading knowledge base...")
-def load_pipeline() -> RAGPipeline:
-    """Built once per server process and reused across requests."""
+def load_pipeline(version: str) -> RAGPipeline:
+    """Built once per server process and reused across requests.
+
+    `version` is part of the cache key: a redeploy that changes the package
+    version discards the cached object instead of resurrecting an instance
+    built from older code.
+    """
     return RAGPipeline()
 
 
@@ -78,7 +83,7 @@ def main() -> None:
         st.stop()
 
     try:
-        pipeline = load_pipeline()
+        pipeline = load_pipeline(__version__)
     except FileNotFoundError as exc:
         st.error(str(exc))
         st.stop()
