@@ -1,0 +1,9 @@
+# Runtime dependencies for the deployed Streamlit app.
+# Deliberately excludes torch / sentence-transformers: embeddings are computed
+# ahead of time by ingest.py, so the app only needs to search a numpy index.
+streamlit>=1.40
+anthropic>=1.0
+numpy>=1.26
+beautifulsoup4>=4.12
+python-dotenv>=1.0
+certifi>=2024.0
