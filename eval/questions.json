@@ -1,0 +1,161 @@
+{
+  "_comment": "Evaluation questions. `expect` lists substrings that a relevant chunk should contain; a question is satisfied when a retrieved chunk contains any of them. This is cheaper to maintain than chunk-ID labels, which change on every re-index.",
+  "questions": [
+    {
+      "q": "كيف أجدد تأشيرتي؟",
+      "lang": "ar",
+      "expect": [
+        "تأشير",
+        "فيزا",
+        "الفيزا",
+        "تجديد"
+      ]
+    },
+    {
+      "q": "وش الحل مع مكاتب السكن اللي ترفض تعريف العقار من سفير؟",
+      "lang": "ar",
+      "expect": [
+        "سكن",
+        "مكاتب",
+        "عقار",
+        "شقة"
+      ]
+    },
+    {
+      "q": "كيف أفتح حساب بنكي في بريطانيا؟",
+      "lang": "ar",
+      "expect": [
+        "بنك",
+        "حساب",
+        "الحساب"
+      ]
+    },
+    {
+      "q": "ما هي أفضل المدن للدراسة في بريطانيا؟",
+      "lang": "ar",
+      "expect": [
+        "مدينة",
+        "مدن",
+        "لندن",
+        "مانشستر"
+      ]
+    },
+    {
+      "q": "كم تكلفة المعيشة في لندن؟",
+      "lang": "ar",
+      "expect": [
+        "تكلفة",
+        "تكاليف",
+        "مصاريف",
+        "باوند",
+        "ايجار",
+        "إيجار",
+        "المعيشه",
+        "المعيشة"
+      ]
+    },
+    {
+      "q": "كيف أجد سكن للطلاب؟",
+      "lang": "ar",
+      "expect": [
+        "سكن",
+        "شقة",
+        "الجامعة"
+      ]
+    },
+    {
+      "q": "متى تنزل المكافأة؟",
+      "lang": "ar",
+      "expect": [
+        "مكافأة",
+        "المكافأة",
+        "راتب"
+      ]
+    },
+    {
+      "q": "ما هي شروط القبول في الماستر؟",
+      "lang": "ar",
+      "expect": [
+        "ماستر",
+        "قبول",
+        "الماجستير"
+      ]
+    },
+    {
+      "q": "هل أحتاج ايلتس؟",
+      "lang": "ar",
+      "expect": [
+        "ايلتس",
+        "آيلتس",
+        "اللغة",
+        "معهد"
+      ]
+    },
+    {
+      "q": "كيف أسجل في الملحقية؟",
+      "lang": "ar",
+      "expect": [
+        "الملحقية",
+        "ملف",
+        "سفير"
+      ]
+    },
+    {
+      "q": "How do I open a UK bank account as a student?",
+      "lang": "en",
+      "expect": [
+        "بنك",
+        "حساب",
+        "bank"
+      ]
+    },
+    {
+      "q": "How do I find student housing in the UK?",
+      "lang": "en",
+      "expect": [
+        "سكن",
+        "شقة",
+        "housing"
+      ]
+    },
+    {
+      "q": "What documents do I need before travelling?",
+      "lang": "en",
+      "expect": [
+        "أوراق",
+        "الجواز",
+        "ملف",
+        "وثائق"
+      ]
+    },
+    {
+      "q": "How much does it cost to live in London?",
+      "lang": "en",
+      "expect": [
+        "تكلفة",
+        "باوند",
+        "لندن",
+        "ايجار"
+      ]
+    },
+    {
+      "q": "Do I need IELTS for my masters?",
+      "lang": "en",
+      "expect": [
+        "ايلتس",
+        "آيلتس",
+        "اللغة",
+        "ماستر"
+      ]
+    },
+    {
+      "q": "What is the visa renewal process?",
+      "lang": "en",
+      "expect": [
+        "تأشير",
+        "فيزا",
+        "الفيزا"
+      ]
+    }
+  ]
+}

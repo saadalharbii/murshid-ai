@@ -97,3 +97,72 @@ class TestVectorStore:
     def test_missing_index_is_actionable(self, tmp_path):
         with pytest.raises(FileNotFoundError, match="ingest"):
             VectorStore.load(tmp_path / "absent.npz")
+
+
+class TestRerankFallback:
+    """Reranking is an enhancement, never a dependency: if it fails the
+    pipeline must still answer using the vector ordering."""
+
+    def _pipeline(self, monkeypatch, rerank_impl):
+        import numpy as np
+
+        from murshid import rag
+        from murshid.store import VectorStore
+
+        store = VectorStore(
+            vectors=np.array([[1.0, 0.0], [0.0, 1.0], [0.7, 0.7]], dtype=np.float32),
+            contents=["first", "second", "third"],
+            metadata=[{}, {}, {}],
+        )
+        monkeypatch.setattr(rag, "embed_query", lambda q: [1.0, 0.0])
+        monkeypatch.setattr(rag, "rerank", rerank_impl)
+        return rag.RAGPipeline(store=store)
+
+    def test_falls_back_to_vector_order_when_rerank_fails(self, monkeypatch):
+        from murshid.rag import RerankError
+
+        def failing(*args, **kwargs):
+            raise RerankError("service down")
+
+        pipeline = self._pipeline(monkeypatch, failing)
+        _, sources, error = pipeline.retrieve("anything")
+
+        assert error is None
+        assert sources, "must still return results when reranking is unavailable"
+        assert sources[0].content == "first"
+
+    def test_rerank_reorders_results(self, monkeypatch):
+        # Rerank indices address the CANDIDATE list, which vector search has
+        # already sorted (first, third, second) - not the store's own order.
+        # Promoting candidate 1 over candidate 0 must invert that ordering.
+        pipeline = self._pipeline(monkeypatch, lambda *a, **k: [(1, 0.9), (0, 0.8)])
+        _, sources, _ = pipeline.retrieve("anything")
+
+        assert [s.content for s in sources] == ["third", "first"]
+        assert sources[0].score == 0.9, "rerank score should replace the cosine score"
+
+    def test_drops_results_below_threshold(self, monkeypatch):
+        from murshid import config
+
+        pipeline = self._pipeline(
+            monkeypatch, lambda *a, **k: [(0, 0.9), (1, config.RERANK_THRESHOLD - 0.1)]
+        )
+        _, sources, _ = pipeline.retrieve("anything")
+
+        assert len(sources) == 1, "weak matches should be filtered out"
+
+
+class TestEmbeddingErrorHandling:
+    def test_embedding_failure_is_reported_not_raised(self, monkeypatch):
+        from murshid import rag
+        from murshid.embeddings import EmbeddingError
+
+        def failing(_):
+            raise EmbeddingError("no key")
+
+        monkeypatch.setattr(rag, "embed_query", failing)
+        pipeline = rag.RAGPipeline(store=object())
+        _, sources, error = pipeline.retrieve("anything")
+
+        assert sources == []
+        assert "no key" in error
