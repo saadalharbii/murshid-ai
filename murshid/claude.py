@@ -9,12 +9,11 @@ the tradeoff is worth the dependency reduction.
 from __future__ import annotations
 
 import json
-import ssl
-import time
 import urllib.error
 import urllib.request
 
 from . import config
+from ._http import ssl_context
 
 _API_URL = "https://api.anthropic.com/v1/messages"
 _API_VERSION = "2023-06-01"
@@ -23,14 +22,6 @@ _API_VERSION = "2023-06-01"
 class ClaudeError(RuntimeError):
     """Raised when the Messages API cannot be reached or returns an error."""
 
-
-def _ssl_context() -> ssl.SSLContext:
-    try:
-        import certifi
-
-        return ssl.create_default_context(cafile=certifi.where())
-    except ImportError:
-        return ssl.create_default_context()
 
 
 def stream(
@@ -65,7 +56,7 @@ def stream(
     )
 
     try:
-        with urllib.request.urlopen(request, timeout=timeout, context=_ssl_context()) as response:
+        with urllib.request.urlopen(request, timeout=timeout, context=ssl_context()) as response:
             for raw in response:
                 line = raw.decode("utf-8", "replace").strip()
                 if not line.startswith("data:"):
@@ -85,3 +76,18 @@ def stream(
         ) from exc
     except (urllib.error.URLError, TimeoutError) as exc:
         raise ClaudeError("Could not reach the language model.") from exc
+
+
+def complete(
+    prompt: str,
+    system: str,
+    model: str | None = None,
+    max_tokens: int = 1024,
+    timeout: float = 60.0,
+) -> str:
+    """Return Claude's full reply as a string.
+
+    The app itself streams; this exists for the offline evaluation harness,
+    which has no one to render to and simply needs the finished text.
+    """
+    return "".join(stream(prompt, system, model=model, max_tokens=max_tokens, timeout=timeout))

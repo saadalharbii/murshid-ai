@@ -157,5 +157,32 @@
         "الفيزا"
       ]
     }
+  ],
+  "unanswerable": [
+    {
+      "q": "كيف أستخرج تأشيرة دراسة في أستراليا؟",
+      "lang": "ar",
+      "why": "Australia is outside this archive, which is UK-only"
+    },
+    {
+      "q": "What is the tuition fee at the University of Tokyo?",
+      "lang": "en",
+      "why": "Japan is outside this archive"
+    },
+    {
+      "q": "ما هو أفضل نوع من القهوة المختصة؟",
+      "lang": "ar",
+      "why": "unrelated to studying abroad entirely"
+    },
+    {
+      "q": "How do I file a US federal tax return as a student?",
+      "lang": "en",
+      "why": "US tax law is outside this archive"
+    },
+    {
+      "q": "كم راتب المبتعث في كندا لعام 2027؟",
+      "lang": "ar",
+      "why": "Canada, and a future year the archive cannot contain"
+    }
   ]
 }

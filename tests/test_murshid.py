@@ -166,3 +166,56 @@ class TestEmbeddingErrorHandling:
 
         assert sources == []
         assert "no key" in error
+
+
+class TestRefusalDetection:
+    """The answer eval decides whether Claude declined a question. Getting this
+    wrong silently corrupts the metric, and it did during development: quoted
+    student chatter was scored as the assistant refusing."""
+
+    def _is_refusal(self, text):
+        import sys
+        from pathlib import Path
+
+        sys.path.insert(0, str(Path(__file__).parent.parent / "eval"))
+        from run_answer_eval import is_refusal
+
+        return is_refusal(text)
+
+    def test_empty_answer_is_a_refusal(self):
+        assert self._is_refusal("   ")
+
+    def test_opening_decline_is_a_refusal(self):
+        assert self._is_refusal("The excerpts do not contain information about Tokyo.")
+        assert self._is_refusal("لا تحتوي المقتطفات على معلومات عن أستراليا.")
+
+    def test_quoted_chatter_is_not_a_refusal(self):
+        # A real answer that answers the question, then later quotes a student
+        # saying nothing had happened yet. The quote sits outside the opening
+        # window, so it must not read as the assistant declining.
+        answer = (
+            "بناءً على النقاشات، المكافأة تُحسب بالتقويم الهجري وهي متأخرة شهر، "
+            "فبعض الطلاب ذكروا أنهم ينتظرون تقريباً شهرين حتى تنزل كاملة [4]. "
+            "وأحد المشاركين ذكر أن المكافأة تنزل يوم ٢٧ من كل شهر [2]، "
+            "بينما قال آخر والله لين الحين ما صار شي ولا يوجد رد [1]"
+        )
+        assert not self._is_refusal(answer)
+
+    def test_refusal_reaching_its_point_late_is_caught(self):
+        # A real Arabic refusal opened with an apology and only named the gap
+        # in the following sentence; searching just the first sentence missed it.
+        answer = (
+            "ما أقدر أساعدك بهذا السؤال 🙏\n\n"
+            "المقتطفات المتوفرة لدي تخص تجارب طلاب سعوديين في بريطانيا، "
+            "ولا تحتوي على أي معلومات عن أستراليا."
+        )
+        assert self._is_refusal(answer)
+
+    def test_refusal_that_cites_is_still_a_refusal(self):
+        # A good refusal often cites the excerpts to show what they DO cover,
+        # so the presence of citations must not rule a refusal out.
+        answer = (
+            "I don't have any information about the University of Tokyo. "
+            "The discussions only cover UK topics [1][2][3]."
+        )
+        assert self._is_refusal(answer)

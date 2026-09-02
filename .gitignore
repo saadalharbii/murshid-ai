@@ -79,3 +79,4 @@ ChatExport_*/contacts/
 .venv-app/
 data/*.partial.npy
 eval/.embedding_cache.pkl
+eval/.answer_cache.json
