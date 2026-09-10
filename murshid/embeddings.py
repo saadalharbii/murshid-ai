@@ -9,29 +9,15 @@ question-to-passage retrieval better than a symmetric paraphrase model.
 from __future__ import annotations
 
 import json
-import ssl
 import time
 import urllib.error
 import urllib.request
 
 from . import config
+from ._http import ssl_context
 
 _API_URL = "https://api.voyageai.com/v1/embeddings"
 
-
-def _ssl_context() -> ssl.SSLContext:
-    """Build an SSL context, preferring certifi's CA bundle.
-
-    Python installations from python.org do not always have access to the
-    system trust store, which makes HTTPS requests fail with
-    CERTIFICATE_VERIFY_FAILED even though curl works.
-    """
-    try:
-        import certifi
-
-        return ssl.create_default_context(cafile=certifi.where())
-    except ImportError:
-        return ssl.create_default_context()
 
 _MAX_BATCH = 128
 
@@ -71,7 +57,7 @@ def _post(texts: list[str], input_type: str, timeout: float) -> list[list[float]
 
     for attempt in range(6):
         try:
-            with urllib.request.urlopen(request, timeout=timeout, context=_ssl_context()) as response:
+            with urllib.request.urlopen(request, timeout=timeout, context=ssl_context()) as response:
                 body = json.load(response)
             return [item["embedding"] for item in body["data"]]
         except urllib.error.HTTPError as exc:

@@ -31,19 +31,33 @@ class TestLanguageDetection:
 
 
 class TestChunking:
-    def _messages(self, count: int, text: str = "a message"):
+    """Chunking follows conversation boundaries, not a character budget."""
+
+    def _messages(self, count, text="a message", gap_minutes=0, author=None):
+        from datetime import datetime, timedelta
+
+        base = datetime(2019, 8, 1, 17, 0, 0)
         return [
-            {"content": f"{text} {i}", "metadata": {"author": f"user{i}", "date": f"day{i}"}}
+            {
+                "content": f"{text} {i}",
+                "metadata": {
+                    "author": author or f"user{i}",
+                    "date": f"day{i}",
+                    "timestamp": base + timedelta(minutes=gap_minutes * i),
+                    "message_id": f"message{i}",
+                    "reply_to": None,
+                },
+            }
             for i in range(count)
         ]
 
     def test_groups_messages_into_chunks(self):
-        chunks = TelegramParser().chunk(self._messages(50), size=100, overlap=10)
+        chunks = TelegramParser().chunk(self._messages(50, text="x" * 60))
         assert len(chunks) > 1
         assert all(chunk["content"] for chunk in chunks)
 
     def test_merges_metadata(self):
-        chunks = TelegramParser().chunk(self._messages(3), size=10_000, overlap=0)
+        chunks = TelegramParser().chunk(self._messages(3))
         metadata = chunks[0]["metadata"]
         assert metadata["message_count"] == 3
         assert "user0" in metadata["authors"]
@@ -53,8 +67,42 @@ class TestChunking:
         assert TelegramParser().chunk([]) == []
 
     def test_preserves_arabic(self):
-        messages = [{"content": "مرحبا بالعالم", "metadata": {"author": "a", "date": "d"}}]
+        messages = self._messages(1)
+        messages[0]["content"] = "مرحبا بالعالم"
         assert "مرحبا" in TelegramParser().chunk(messages)[0]["content"]
+
+    def test_labels_each_line_with_its_author(self):
+        # Speaker attribution is what preserves who answered whom.
+        chunks = TelegramParser().chunk(self._messages(2, text="x" * 40))
+        assert "user0: " in chunks[0]["content"]
+        assert "user1: " in chunks[0]["content"]
+
+    def test_long_pause_starts_a_new_chunk(self):
+        # Two messages an hour apart are not the same conversation.
+        messages = self._messages(2, text="x" * 80, gap_minutes=60)
+        assert len(TelegramParser().chunk(messages)) == 2
+
+    def test_reply_into_recent_history_keeps_thread_together(self):
+        # A reply arriving after a pause continues the thread rather than
+        # starting a new one - 367 real messages in the corpus do this.
+        messages = self._messages(2, text="x" * 80, gap_minutes=60)
+        messages[1]["metadata"]["reply_to"] = "message0"
+        assert len(TelegramParser().chunk(messages)) == 1
+
+    def test_never_splits_mid_message(self):
+        # Splitting only on message boundaries is what removed the need for
+        # the old character overlap.
+        chunks = TelegramParser().chunk(self._messages(40, text="y" * 100))
+        for chunk in chunks:
+            for line in chunk["content"].split("\n"):
+                assert line.endswith(tuple("0123456789")), line[:40]
+
+    def test_drops_per_message_metadata_from_the_chunk(self):
+        # A chunk spans many messages, so a single message_id or reply_to
+        # would misattribute it.
+        metadata = TelegramParser().chunk(self._messages(3))[0]["metadata"]
+        for key in ("timestamp", "reply_to", "message_id", "author"):
+            assert key not in metadata
 
 
 class TestVectorStore:

@@ -34,6 +34,10 @@ from murshid.embeddings import embed_query  # noqa: E402
 from murshid.rerank import RerankError, rerank  # noqa: E402
 from murshid.store import VectorStore  # noqa: E402
 
+# Above this length a chunk holds several messages, so incidental keyword
+# matches become likely and the relevance bar rises.
+_LONG_CHUNK = 500
+
 QUESTIONS = Path(__file__).parent / "questions.json"
 CACHE = Path(__file__).parent / ".embedding_cache.pkl"
 
@@ -54,13 +58,21 @@ def cached_embedding(question: str, cache: dict) -> list[float]:
 
 
 def is_relevant(content: str, expect: list[str]) -> bool:
-    """A chunk counts as relevant when it matches at least two expected terms.
+    """A chunk counts as relevant when it matches enough expected terms.
 
-    Requiring two is deliberate: the corpus is one community talking about one
-    broad subject, so a single keyword like "سكن" appears almost everywhere and
-    a one-term rule scores every chunk relevant.
+    The bar scales with chunk length, because a fixed one does not survive a
+    chunking change. Under the old 500-character blend, two terms were needed:
+    a single common word like "سكن" appeared almost everywhere, so one term
+    marked nearly every chunk relevant. Conversation-aware chunking cut the
+    mean chunk to ~326 characters, and the same two-term rule then scored
+    correct answers as misses - the chunk "tuition is 10-16 thousand pounds a
+    year and you need about 14 thousand for living" was judged irrelevant to a
+    question about London costs because it contained one keyword rather than
+    two. Requiring one term from a short, focused chunk and two from a long,
+    mixed one measures retrieval instead of chunk size.
     """
-    return sum(1 for term in expect if term in content) >= 2
+    matches = sum(1 for term in expect if term in content)
+    return matches >= (2 if len(content) > _LONG_CHUNK else 1)
 
 
 def evaluate(use_rerank: bool) -> dict:

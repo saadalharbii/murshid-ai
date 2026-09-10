@@ -14,16 +14,23 @@ reliably with no maintenance, not that it has many features.
 Single Streamlit process. No API server, no database.
 
 ```
-question -> Voyage embedding -> cosine search over data/index.npz
-         -> top-5 passages -> Claude -> answer in the question's language
+question -> Voyage embedding -> cosine search over data/index.npz (top-40)
+         -> Voyage rerank -> top-5 passages
+         -> Claude -> answer in the question's language
 ```
 
+Cosine similarity barely separates chunks in this corpus, so vector search
+casts a wide net and a cross-encoder reranker picks the final passages. If
+reranking fails the vector order is used instead - a worse answer beats none.
+
 - `murshid/config.py` - settings from environment
-- `murshid/telegram.py` - HTML export parser and chunker
+- `murshid/telegram.py` - HTML export parser and conversation-aware chunker
 - `murshid/embeddings.py` - Voyage AI client
 - `murshid/claude.py` - Anthropic Messages API client
 - `murshid/store.py` - numpy vector store
 - `murshid/rag.py` - language detection, retrieval, prompting
+- `murshid/rerank.py` - Voyage reranker, with vector-order fallback
+- `eval/` - retrieval and answer-quality harnesses (see their docstrings)
 - `ingest.py` - builds `data/index.npz`
 - `streamlit_app.py` - chat interface
 

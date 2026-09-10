@@ -41,6 +41,18 @@ UK-general rather than London-specific, and did not deserve a 1.
 So treat faithfulness as a floor and a change detector, not a verdict, and read
 the answer before acting on a low score. The same rule applies here as in
 run_eval.py: when the metric looks surprising, the metric is the first suspect.
+
+Known limit of the refusal check
+--------------------------------
+It over-reports. An answer that opens by narrowing scope - "there is no clear
+consensus on the best city, but students mentioned these criteria [1]" - and
+then answers at length is counted as a refusal. Two such answers are miscounted
+today, so "answered" is a lower bound on the real figure.
+
+Citation count cannot fix this: across real answers, refusals cited 0, 2, 2, 3
+and 5 distinct excerpts while a substantive answer cited 2, so no threshold
+separates them. Distinguishing a hedge from a decline needs the judge, not a
+keyword rule. Always read the listed refusals rather than trusting the count.
 """
 
 from __future__ import annotations
@@ -162,8 +174,11 @@ def is_refusal(answer: str) -> bool:
     got four Arabic answers wrong: they were well-cited and correct, but quoted
     students saying "لا يوجد", which read as the assistant declining.
 
-    Presence of citations deliberately does NOT rule out a refusal - a good
-    refusal often cites the excerpts to show what they do cover instead.
+    Presence of citations deliberately does NOT rule out a refusal, and cannot
+    be used to distinguish one: measured across real answers, refusals cited 0,
+    2, 2, 3 and 5 distinct excerpts while a substantive answer cited 2. A good
+    refusal cites the excerpts to show what they do cover, so no threshold on
+    citation count separates the two.
 
     An empty answer counts: the app renders its own 'not in the archive'
     message when retrieval returns nothing, so that path is a refusal too.

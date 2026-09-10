@@ -13,7 +13,7 @@ VOYAGE_API_KEY = os.getenv("VOYAGE_API_KEY", "")
 
 # Models
 CLAUDE_MODEL = os.getenv("CLAUDE_MODEL", "claude-sonnet-5")
-VOYAGE_MODEL = os.getenv("VOYAGE_MODEL", "voyage-3")
+VOYAGE_MODEL = os.getenv("VOYAGE_MODEL", "voyage-4-large")
 RERANK_MODEL = os.getenv("RERANK_MODEL", "rerank-2.5-lite")
 EMBEDDING_DIM = 1024
 
@@ -26,8 +26,8 @@ RETRIEVE_CANDIDATES = int(os.getenv("RETRIEVE_CANDIDATES", "40"))
 TOP_K_RESULTS = int(os.getenv("TOP_K_RESULTS", "5"))
 SIMILARITY_THRESHOLD = float(os.getenv("SIMILARITY_THRESHOLD", "0.0"))
 RERANK_THRESHOLD = float(os.getenv("RERANK_THRESHOLD", "0.40"))
-CHUNK_SIZE = int(os.getenv("CHUNK_SIZE", "500"))
-CHUNK_OVERLAP = int(os.getenv("CHUNK_OVERLAP", "50"))
+CHUNK_SIZE = int(os.getenv("CHUNK_SIZE", "1200"))
+CHUNK_OVERLAP = int(os.getenv("CHUNK_OVERLAP", "0"))  # unused: chunks split on message boundaries
 
 # Paths
 INDEX_PATH = Path(__file__).parent.parent / "data" / "index.npz"

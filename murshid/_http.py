@@ -30,7 +30,10 @@ def ssl_context() -> ssl.SSLContext:
             import certifi
 
             _ssl_singleton = ssl.create_default_context(cafile=certifi.where())
-        except ImportError:
+        except (ImportError, OSError, ssl.SSLError):
+            # certifi missing, or its bundle unreadable - seen transiently on
+            # iCloud-synced checkouts. The system trust store may still work,
+            # and failing the request outright helps no one.
             _ssl_singleton = ssl.create_default_context()
 
     return _ssl_singleton
