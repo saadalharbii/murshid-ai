@@ -33,8 +33,16 @@ def _ssl_context() -> ssl.SSLContext:
     except ImportError:
         return ssl.create_default_context()
 
-_MAX_BATCH = 16
-_FREE_TIER_DELAY = 21.0  # 3 requests/min ceiling on Voyage's free tier
+_MAX_BATCH = 128
+
+# Sleep applied only AFTER the API says 429. Voyage's free tier allows 3
+# requests/min, so a rate-limited retry has to wait out most of a minute;
+# a paid key raises the ceiling to thousands and never reaches this path.
+# The delay is deliberately NOT applied pre-emptively between batches: doing
+# so throttled ingestion to free-tier speed regardless of the account's real
+# limit, which cost ~14 minutes of sleeping on a corpus that embeds in under
+# a minute.
+_RATE_LIMIT_DELAY = 21.0
 
 
 class EmbeddingError(RuntimeError):
@@ -70,7 +78,7 @@ def _post(texts: list[str], input_type: str, timeout: float) -> list[list[float]
             # 429 is the free tier's rate limit; 5xx are transient server faults.
             # Both are worth retrying - the request itself is fine.
             if (exc.code == 429 or exc.code >= 500) and attempt < 5:
-                delay = _FREE_TIER_DELAY if exc.code == 429 else 2.0
+                delay = _RATE_LIMIT_DELAY if exc.code == 429 else 2.0
                 time.sleep(delay * (attempt + 1))
                 continue
             if exc.code == 401:
@@ -95,12 +103,15 @@ def embed_query(text: str, timeout: float = 30.0) -> list[float]:
 def embed_documents(
     texts: list[str], timeout: float = 120.0, progress=None
 ) -> list[list[float]]:
-    """Embed a list of documents, batching to respect API limits."""
+    """Embed a list of documents, batching to respect API limits.
+
+    Batches are sent back to back. If the account is rate limited the API
+    answers 429 and _post waits it out, so throughput matches whatever the key
+    actually allows instead of being pinned to the slowest possible tier.
+    """
     vectors: list[list[float]] = []
 
     for start in range(0, len(texts), _MAX_BATCH):
-        if start:
-            time.sleep(_FREE_TIER_DELAY)  # stay within the free tier's request rate
         batch = texts[start : start + _MAX_BATCH]
         vectors.extend(_post(batch, "document", timeout))
         if progress:
