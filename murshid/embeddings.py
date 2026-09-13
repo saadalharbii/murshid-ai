@@ -37,10 +37,7 @@ class EmbeddingError(RuntimeError):
 
 def _post(texts: list[str], input_type: str, timeout: float) -> list[list[float]]:
     if not config.VOYAGE_API_KEY:
-        raise EmbeddingError(
-            "VOYAGE_API_KEY is not set. Add it to .env "
-            "(free key at https://www.voyageai.com/)."
-        )
+        raise EmbeddingError("Search is not configured.")
 
     payload = json.dumps(
         {"input": texts, "model": config.VOYAGE_MODEL, "input_type": input_type}
@@ -67,18 +64,18 @@ def _post(texts: list[str], input_type: str, timeout: float) -> list[list[float]
                 delay = _RATE_LIMIT_DELAY if exc.code == 429 else 2.0
                 time.sleep(delay * (attempt + 1))
                 continue
-            if exc.code == 401:
-                raise EmbeddingError("Voyage rejected the API key.") from exc
-            raise EmbeddingError(
-                f"The embedding service returned an error ({exc.code}). Please try again."
-            ) from exc
+            # User-facing text stays generic and vendor-neutral: an end user
+            # can act on "search is unavailable", not on a provider's name or
+            # an HTTP status. The status is kept on the chained exception for
+            # whoever reads the logs.
+            raise EmbeddingError("Search is unavailable right now.") from exc
         except (urllib.error.URLError, TimeoutError) as exc:
             if attempt < 5:
                 time.sleep(2.0 * (attempt + 1))
                 continue
-            raise EmbeddingError("Could not reach the embedding service.") from exc
+            raise EmbeddingError("Could not reach the search service.") from exc
 
-    raise EmbeddingError("The embedding service is busy. Please try again in a moment.")
+    raise EmbeddingError("Search is busy right now.")
 
 
 def embed_query(text: str, timeout: float = 30.0) -> list[float]:

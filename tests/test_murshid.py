@@ -6,10 +6,13 @@ calls are exercised by running the app.
 
 from __future__ import annotations
 
+import re
+
 import numpy as np
 import pytest
 
 from ingest import corpus_fingerprint
+from murshid.messages import TROUBLE_AR, TROUBLE_EN, no_results, trouble
 from murshid.rag import detect_language
 from murshid.store import VectorStore
 from murshid.telegram import TelegramParser
@@ -299,3 +302,39 @@ class TestCorpusFingerprint:
         # of concatenated content alone would miss this; the count prefix and
         # per-chunk hashing together catch it.
         assert corpus_fingerprint(["ab", "cd"]) != corpus_fingerprint(["abc", "d"])
+
+
+class TestUserFacingErrors:
+    """Failures are shown to end users, so they stay generic and bilingual.
+
+    Two rules: never name the upstream vendor or an HTTP status in text a
+    visitor reads, and speak the language they asked in. The diagnostic detail
+    lives on the chained exception for the logs.
+    """
+
+    def test_embedding_errors_never_name_the_vendor(self):
+        import inspect
+
+        import murshid.embeddings as embeddings
+
+        source = inspect.getsource(embeddings)
+        messages = re.findall(r'EmbeddingError\(\s*"([^"]+)"', source)
+        assert messages, "expected to find EmbeddingError messages"
+        for message in messages:
+            assert "voyage" not in message.lower(), message
+
+    def test_trouble_message_follows_the_question_language(self):
+        assert trouble("arabic") == TROUBLE_AR
+        assert trouble("english") == TROUBLE_EN
+        assert trouble("arabic") != trouble("english")
+
+    def test_trouble_message_is_not_a_stack_trace(self):
+        for language in ("arabic", "english"):
+            message = trouble(language)
+            assert "Error" not in message
+            assert "Traceback" not in message
+            assert len(message) < 120
+
+    def test_no_results_message_follows_the_question_language(self):
+        assert no_results("arabic") != no_results("english")
+        assert "أرشيف" in no_results("arabic")

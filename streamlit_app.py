@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import sys
+
 import streamlit as st
 
 from murshid import __version__, config
+from murshid.messages import no_results, trouble
 from murshid.rag import RAGPipeline, detect_language
 
 EXAMPLES = [
@@ -144,16 +147,14 @@ def main() -> None:
             _, sources, error = pipeline.retrieve(question)
 
         if error:
-            st.error(error)
+            # The underlying message is for the logs; the reader gets a
+            # generic line in their own language.
+            print(f"retrieval failed: {error}", file=sys.stderr)
+            st.error(trouble(language))
             return
 
         if not sources:
-            text = (
-                "لم أجد في أرشيف المجموعات ما يجيب على سؤالك. جرّب صياغة أخرى."
-                if language == "arabic"
-                else "I couldn't find anything in the archive that answers that. "
-                "Try rephrasing your question."
-            )
+            text = no_results(language)
             st.markdown(directional(text, language), unsafe_allow_html=True)
             st.session_state.messages.append(
                 {"role": "assistant", "content": text, "sources": [], "language": language}
@@ -171,7 +172,8 @@ def main() -> None:
                     directional("".join(parts) + " ▌", language), unsafe_allow_html=True
                 )
         except Exception as exc:
-            placeholder.error(str(exc))
+            print(f"generation failed: {exc}", file=sys.stderr)
+            placeholder.error(trouble(language))
             return
 
         text = "".join(parts).strip()
