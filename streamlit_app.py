@@ -100,8 +100,9 @@ def main() -> None:
         st.caption(f"Claude: `{config.CLAUDE_MODEL}`\n\nEmbeddings: `{config.VOYAGE_MODEL}`")
         st.divider()
         st.caption(
-            "⚠️ Community discussions, not official guidance. "
-            "Verify anything important with your scholarship office."
+            "⚠️ Community discussions, not official guidance, and the archive "
+            "is not current. Visa, banking and NHS rules change - verify "
+            "anything important with your scholarship office."
         )
         if st.button("Clear conversation", use_container_width=True):
             st.session_state.messages = []
