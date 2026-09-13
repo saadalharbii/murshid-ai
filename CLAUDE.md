@@ -20,7 +20,11 @@ question -> Voyage embedding -> cosine search over data/index.npz (top-10)
 ```
 
 Cosine similarity barely separates chunks in this corpus, so a cross-encoder
-reranker orders the final passages. The candidate pool is deliberately narrow:
+reranker orders the final passages. Note that the rerank score is a weak
+confidence signal, not a safety net - measured, answerable and unanswerable
+questions overlap (0.51-0.84 against 0.37-0.66). Declining an out-of-archive
+question is the system prompt's job; `RERANK_THRESHOLD` only trims the worst
+matches first. The candidate pool is deliberately narrow:
 widening it measurably hurts, because the reranker over-promotes chunks that
 restate the question rather than answer it, and a wider net gives it more of
 those to find. See the note in `config.py`. If reranking fails the vector order
