@@ -18,14 +18,28 @@ from . import config
 
 
 class Document:
-    """A retrieved chunk and its similarity to the query."""
+    """A retrieved chunk and its score against the query.
 
-    __slots__ = ("content", "metadata", "score")
+    `score_kind` says what `score` means, because the two stages produce
+    different numbers on different scales: "similarity" is the cosine score
+    from vector search, "relevance" is the reranker's absolute score. They are
+    not comparable, so anything displaying or thresholding a score needs to
+    know which it holds.
+    """
 
-    def __init__(self, content: str, metadata: dict[str, Any], score: float):
+    __slots__ = ("content", "metadata", "score", "score_kind")
+
+    def __init__(
+        self,
+        content: str,
+        metadata: dict[str, Any],
+        score: float,
+        score_kind: str = "similarity",
+    ):
         self.content = content
         self.metadata = metadata
         self.score = score
+        self.score_kind = score_kind
 
 
 class VectorStore:

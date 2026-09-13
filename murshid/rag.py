@@ -117,8 +117,10 @@ class RAGPipeline:
         for index, score in ranked:
             document = candidates[index]
             # Replace the cosine score with the rerank score, which is absolute
-            # and so meaningful to show and to threshold on.
+            # and so meaningful to show and to threshold on. The kind changes
+            # with it, so the UI does not label a rerank score "similarity".
             document.score = score
+            document.score_kind = "relevance"
             if score >= config.RERANK_THRESHOLD:
                 sources.append(document)
 

@@ -65,7 +65,8 @@ def render_sources(sources) -> None:
             excerpt = source.content[:400] + ("..." if len(source.content) > 400 else "")
             st.markdown(
                 f'<div class="source-card">{excerpt}'
-                f'<div class="source-meta">#{i} · similarity {source.score:.0%} · '
+                f'<div class="source-meta">#{i} · {source.score_kind} '
+                f'{source.score:.0%} · '
                 f'{source.metadata.get("authors", "unknown")}</div></div>',
                 unsafe_allow_html=True,
             )
