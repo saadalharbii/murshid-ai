@@ -14,14 +14,17 @@ reliably with no maintenance, not that it has many features.
 Single Streamlit process. No API server, no database.
 
 ```
-question -> Voyage embedding -> cosine search over data/index.npz (top-40)
+question -> Voyage embedding -> cosine search over data/index.npz (top-10)
          -> Voyage rerank -> top-5 passages
          -> Claude -> answer in the question's language
 ```
 
-Cosine similarity barely separates chunks in this corpus, so vector search
-casts a wide net and a cross-encoder reranker picks the final passages. If
-reranking fails the vector order is used instead - a worse answer beats none.
+Cosine similarity barely separates chunks in this corpus, so a cross-encoder
+reranker orders the final passages. The candidate pool is deliberately narrow:
+widening it measurably hurts, because the reranker over-promotes chunks that
+restate the question rather than answer it, and a wider net gives it more of
+those to find. See the note in `config.py`. If reranking fails the vector order
+is used instead - a worse answer beats none.
 
 - `murshid/config.py` - settings from environment
 - `murshid/telegram.py` - HTML export parser and conversation-aware chunker

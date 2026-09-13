@@ -11,7 +11,7 @@ cites them — using only what it found, never its own general knowledge.
 ## How it works
 
 ```
-question ─▶ embedding ─▶ search a prebuilt index ─▶ 40 candidates
+question ─▶ embedding ─▶ search a prebuilt index ─▶ 10 candidates
                                                          │
                                               reranking picks the best 5
                                                          │
@@ -21,9 +21,13 @@ question ─▶ embedding ─▶ search a prebuilt index ─▶ 40 candidates
 
 Retrieval runs in two stages because similarity scores in this corpus sit very
 close together — a single-stage search returns passages that all look about
-equally relevant, and the best ones often rank well below the top five. The
-first stage casts a wide net; the second compares each candidate against the
-question and reorders them properly.
+equally relevant. The second stage compares each candidate against the question
+directly and reorders them.
+
+The candidate pool is kept small on purpose. Handing the reranker forty
+candidates instead of ten measurably worsened results: it tends to favour
+passages that echo the question over ones that answer it, and a wider net gives
+it more of those to pick from.
 
 Embeddings are computed once by `ingest.py` and committed as `data/index.npz`
 (934 passages, ~4 MB), so the app just loads an array and does a matrix

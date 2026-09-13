@@ -17,12 +17,21 @@ VOYAGE_MODEL = os.getenv("VOYAGE_MODEL", "voyage-4-large")
 RERANK_MODEL = os.getenv("RERANK_MODEL", "rerank-2.5-lite")
 EMBEDDING_DIM = 1024
 
-# Retrieval. Vector search casts a wide net and the reranker decides what is
-# actually relevant, so the vector threshold stays low on purpose: cosine
-# scores here sit close together (chunks average 0.42 similarity to each
-# other), which makes them a poor relevance filter. The rerank score is
-# absolute and comparable across queries, so it carries the cutoff instead.
-RETRIEVE_CANDIDATES = int(os.getenv("RETRIEVE_CANDIDATES", "40"))
+# Retrieval. Vector search supplies the candidate pool and the reranker orders
+# it. The vector threshold stays low on purpose: cosine scores here sit close
+# together (chunks average 0.42 similarity to each other), which makes them a
+# poor relevance filter. The rerank score is absolute and comparable across
+# queries, so it carries the cutoff instead.
+#
+# The pool is deliberately narrow. Measured on the 28-question eval, widening
+# it monotonically hurts: pool 5 and 10 score MRR 0.86/0.85, pool 40 scores
+# 0.79 and drops recall@5 to 0.96. The reranker over-promotes chunks that
+# restate the question - for "how much does London cost" it demoted a chunk
+# giving actual figures to rank 14 and promoted one that merely asks about
+# prices - and a wider net gives it more of those to find. Keeping the pool
+# near the number of results retains the reranker's ordering benefit without
+# handing it 35 chances to find a plausible-looking non-answer.
+RETRIEVE_CANDIDATES = int(os.getenv("RETRIEVE_CANDIDATES", "10"))
 TOP_K_RESULTS = int(os.getenv("TOP_K_RESULTS", "5"))
 SIMILARITY_THRESHOLD = float(os.getenv("SIMILARITY_THRESHOLD", "0.0"))
 RERANK_THRESHOLD = float(os.getenv("RERANK_THRESHOLD", "0.40"))
