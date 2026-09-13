@@ -21,9 +21,10 @@ Three checks, in increasing order of cost:
     python eval/run_answer_eval.py --judge         # adds the LLM judge
     python eval/run_answer_eval.py --limit 5       # a quick subset
 
-Answers are cached to disk keyed by question and model, so re-running to add
-the judge does not pay for generation twice. Delete eval/.answer_cache.json to
-force regeneration after a prompt or retrieval change.
+Answers are cached to disk keyed by the question, the models, and the
+retrieval settings and the system prompts, so re-running to add the judge does
+not pay for generation twice while any change that can alter an answer
+invalidates the entry.
 
 Reading the numbers
 -------------------
@@ -58,6 +59,7 @@ keyword rule. Always read the listed refusals rather than trusting the count.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
 import sys
@@ -67,7 +69,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from murshid import config  # noqa: E402
 from murshid.claude import ClaudeError, complete  # noqa: E402
-from murshid.rag import RAGPipeline  # noqa: E402
+from murshid.rag import _SYSTEM_AR, _SYSTEM_EN, RAGPipeline  # noqa: E402
 
 QUESTIONS = Path(__file__).parent / "questions.json"
 CACHE = Path(__file__).parent / ".answer_cache.json"
@@ -128,9 +130,37 @@ def save_cache(cache: dict) -> None:
     CACHE.write_text(json.dumps(cache, ensure_ascii=False, indent=2))
 
 
+def cache_key(question: str) -> str:
+    """Identify a cached answer by everything that can change it.
+
+    The retrieval settings belong in the key: an answer is a function of the
+    passages that reached Claude, so a change to the candidate pool or the
+    rerank cutoff produces a different answer from the same question and
+    model. The system prompts count for the same reason. Keying on the models
+    alone silently served answers built from a previous configuration and
+    reported them as current.
+    """
+    settings = ":".join(
+        str(part)
+        for part in (
+            config.CLAUDE_MODEL,
+            config.VOYAGE_MODEL,
+            config.RERANK_MODEL,
+            config.RETRIEVE_CANDIDATES,
+            config.TOP_K_RESULTS,
+            config.RERANK_THRESHOLD,
+        )
+    )
+    # The system prompts shape the answer as much as retrieval does, so they
+    # are part of the identity too - hashed rather than inlined to keep the
+    # key readable.
+    prompts = hashlib.sha256((_SYSTEM_AR + _SYSTEM_EN).encode()).hexdigest()[:12]
+    return f"{settings}:{prompts}:{question}"
+
+
 def answer_question(pipeline: RAGPipeline, question: str, cache: dict) -> dict:
     """Run the real pipeline end to end, reusing a cached answer when present."""
-    key = f"{config.CLAUDE_MODEL}:{config.VOYAGE_MODEL}:{question}"
+    key = cache_key(question)
     if key in cache:
         return cache[key]
 

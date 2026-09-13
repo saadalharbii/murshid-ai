@@ -12,6 +12,7 @@ import numpy as np
 import pytest
 
 from ingest import corpus_fingerprint
+from murshid import config
 from murshid.messages import TROUBLE_AR, TROUBLE_EN, no_results, trouble
 from murshid.rag import detect_language
 from murshid.store import VectorStore
@@ -338,3 +339,39 @@ class TestUserFacingErrors:
     def test_no_results_message_follows_the_question_language(self):
         assert no_results("arabic") != no_results("english")
         assert "أرشيف" in no_results("arabic")
+
+
+class TestAnswerCacheKey:
+    """A cached answer is only reusable if nothing that shaped it has changed.
+
+    The answer eval caches generated answers to avoid paying twice. The key
+    therefore has to cover retrieval settings and prompts, not just the model
+    names - otherwise a retrieval change reports stale numbers as current.
+    """
+
+    def test_key_changes_with_candidate_pool(self, monkeypatch):
+        from eval.run_answer_eval import cache_key
+
+        before = cache_key("q")
+        monkeypatch.setattr(config, "RETRIEVE_CANDIDATES", config.RETRIEVE_CANDIDATES + 30)
+        assert cache_key("q") != before
+
+    def test_key_changes_with_rerank_threshold(self, monkeypatch):
+        from eval.run_answer_eval import cache_key
+
+        before = cache_key("q")
+        monkeypatch.setattr(config, "RERANK_THRESHOLD", config.RERANK_THRESHOLD + 0.1)
+        assert cache_key("q") != before
+
+    def test_key_changes_with_the_system_prompt(self, monkeypatch):
+        import eval.run_answer_eval as harness
+
+        before = harness.cache_key("q")
+        monkeypatch.setattr(harness, "_SYSTEM_EN", "a different prompt")
+        assert harness.cache_key("q") != before
+
+    def test_same_settings_give_a_stable_key(self):
+        from eval.run_answer_eval import cache_key
+
+        assert cache_key("q") == cache_key("q")
+        assert cache_key("q") != cache_key("other")
