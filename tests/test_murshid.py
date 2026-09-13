@@ -9,6 +9,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
+from ingest import corpus_fingerprint
 from murshid.rag import detect_language
 from murshid.store import VectorStore
 from murshid.telegram import TelegramParser
@@ -267,3 +268,34 @@ class TestRefusalDetection:
             "The discussions only cover UK topics [1][2][3]."
         )
         assert self._is_refusal(answer)
+
+
+class TestCorpusFingerprint:
+    """The ingest checkpoint is only valid for the corpus that produced it.
+
+    Vectors are paired with chunk text by list position, so resuming a run
+    against re-chunked content would attach every vector to the wrong passage
+    and produce an index whose citations point at unrelated conversations.
+    """
+
+    def test_same_corpus_produces_the_same_fingerprint(self):
+        chunks = ["one", "two", "three"]
+        assert corpus_fingerprint(chunks) == corpus_fingerprint(list(chunks))
+
+    def test_changed_content_changes_the_fingerprint(self):
+        before = corpus_fingerprint(["one", "two"])
+        after = corpus_fingerprint(["one", "two!"])
+        assert before != after
+
+    def test_reordering_changes_the_fingerprint(self):
+        # Order matters: position is what binds a vector to its text.
+        assert corpus_fingerprint(["a", "b"]) != corpus_fingerprint(["b", "a"])
+
+    def test_different_chunk_count_changes_the_fingerprint(self):
+        assert corpus_fingerprint(["a", "b"]) != corpus_fingerprint(["a", "b", "c"])
+
+    def test_boundary_shift_is_detected(self):
+        # The realistic failure: same text, different chunk boundaries. A hash
+        # of concatenated content alone would miss this; the count prefix and
+        # per-chunk hashing together catch it.
+        assert corpus_fingerprint(["ab", "cd"]) != corpus_fingerprint(["abc", "d"])
