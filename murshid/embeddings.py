@@ -8,13 +8,10 @@ question-to-passage retrieval better than a symmetric paraphrase model.
 
 from __future__ import annotations
 
-import json
-import time
 import urllib.error
-import urllib.request
 
 from . import config
-from ._http import ssl_context
+from ._http import post_json
 
 _API_URL = "https://api.voyageai.com/v1/embeddings"
 
@@ -36,46 +33,32 @@ class EmbeddingError(RuntimeError):
 
 
 def _post(texts: list[str], input_type: str, timeout: float) -> list[list[float]]:
+    """Embed a batch, mapping transport failures onto EmbeddingError.
+
+    Retries and backoff live in `_http.post_json`, shared with the reranker,
+    so there is one retry policy to reason about rather than two that drift.
+    """
     if not config.VOYAGE_API_KEY:
         raise EmbeddingError("Search is not configured.")
 
-    payload = json.dumps(
-        {"input": texts, "model": config.VOYAGE_MODEL, "input_type": input_type}
-    ).encode()
+    try:
+        body = post_json(
+            _API_URL,
+            {"input": texts, "model": config.VOYAGE_MODEL, "input_type": input_type},
+            {"Authorization": f"Bearer {config.VOYAGE_API_KEY}"},
+            timeout=timeout,
+            attempts=6,
+            rate_limit_delay=_RATE_LIMIT_DELAY,
+        )
+    except urllib.error.HTTPError as exc:
+        # User-facing text stays generic and vendor-neutral: an end user can
+        # act on "search is unavailable", not on a provider's name or an HTTP
+        # status. The status is kept on the chained exception for the logs.
+        raise EmbeddingError("Search is unavailable right now.") from exc
+    except (urllib.error.URLError, TimeoutError) as exc:
+        raise EmbeddingError("Could not reach the search service.") from exc
 
-    request = urllib.request.Request(
-        _API_URL,
-        data=payload,
-        headers={
-            "Authorization": f"Bearer {config.VOYAGE_API_KEY}",
-            "Content-Type": "application/json",
-        },
-    )
-
-    for attempt in range(6):
-        try:
-            with urllib.request.urlopen(request, timeout=timeout, context=ssl_context()) as response:
-                body = json.load(response)
-            return [item["embedding"] for item in body["data"]]
-        except urllib.error.HTTPError as exc:
-            # 429 is the free tier's rate limit; 5xx are transient server faults.
-            # Both are worth retrying - the request itself is fine.
-            if (exc.code == 429 or exc.code >= 500) and attempt < 5:
-                delay = _RATE_LIMIT_DELAY if exc.code == 429 else 2.0
-                time.sleep(delay * (attempt + 1))
-                continue
-            # User-facing text stays generic and vendor-neutral: an end user
-            # can act on "search is unavailable", not on a provider's name or
-            # an HTTP status. The status is kept on the chained exception for
-            # whoever reads the logs.
-            raise EmbeddingError("Search is unavailable right now.") from exc
-        except (urllib.error.URLError, TimeoutError) as exc:
-            if attempt < 5:
-                time.sleep(2.0 * (attempt + 1))
-                continue
-            raise EmbeddingError("Could not reach the search service.") from exc
-
-    raise EmbeddingError("Search is busy right now.")
+    return [item["embedding"] for item in body["data"]]
 
 
 def embed_query(text: str, timeout: float = 30.0) -> list[float]:
