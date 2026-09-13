@@ -83,6 +83,7 @@ def evaluate(use_rerank: bool) -> dict:
     hits_at_5 = 0
     reciprocal_ranks = []
     spreads = []
+    misses = []
 
     for item in questions:
         vector = np.asarray(cached_embedding(item["q"], cache), dtype=np.float32)
@@ -118,6 +119,7 @@ def evaluate(use_rerank: bool) -> dict:
             reciprocal_ranks.append(1 / rank)
         else:
             reciprocal_ranks.append(0.0)
+            misses.append(item["q"])
 
     n = len(questions)
     return {
@@ -125,6 +127,7 @@ def evaluate(use_rerank: bool) -> dict:
         "recall@5": hits_at_5 / n,
         "mrr": sum(reciprocal_ranks) / n,
         "mean_spread": sum(spreads) / len(spreads) if spreads else 0.0,
+        "misses": misses,
     }
 
 
@@ -146,6 +149,15 @@ def main() -> int:
     for name, r in results.items():
         print(f"{name:<18}{r['recall@5']:>10.2f}{r['mrr']:>8.2f}{r['mean_spread']:>9.3f}")
     print(f"\n{results['vector only']['questions']} questions | model {config.VOYAGE_MODEL}")
+
+    # Name the misses. An aggregate that drops tells you something broke; the
+    # list tells you what, and whether the question or the retrieval is at
+    # fault - which is usually the question.
+    for name, r in results.items():
+        if r["misses"]:
+            print(f"\nmissed by {name}:")
+            for question in r["misses"]:
+                print(f"  - {question}")
     return 0
 
 

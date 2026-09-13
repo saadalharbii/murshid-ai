@@ -1,5 +1,5 @@
 {
-  "_comment": "Evaluation questions. `expect` lists substrings that a relevant chunk should contain; a question is satisfied when a retrieved chunk contains any of them. This is cheaper to maintain than chunk-ID labels, which change on every re-index.",
+  "_comment": "Evaluation questions. `expect` lists substrings that a relevant chunk should contain; a question is satisfied when a retrieved chunk contains any of them (two, for chunks over 500 chars - see run_eval.is_relevant). This is cheaper to maintain than chunk-ID labels, which change on every re-index. Questions marked \"hard\": true are deliberately chosen to be losable - they paraphrase the archive rather than quoting it, or target a topic mentioned in only one or two chunks. The easy set saturated at recall@5 1.00, which hid regressions rather than proving quality; these exist so the metric can move. `unanswerable` holds questions the archive genuinely cannot answer. The \"near\" ones are UK student topics that simply never came up - a harder and more realistic decline than another country, which the wording alone gives away.",
   "questions": [
     {
       "q": "كيف أجدد تأشيرتي؟",
@@ -156,6 +156,142 @@
         "فيزا",
         "الفيزا"
       ]
+    },
+    {
+      "q": "دفعت مقدم على سكن وبغيت ألغي، هل يرجعون الفلوس؟",
+      "lang": "ar",
+      "expect": [
+        "ديبوزت",
+        "holding",
+        "استرد",
+        "المبلغ",
+        "سكن"
+      ],
+      "hard": true
+    },
+    {
+      "q": "وش الفرق بين بطاقة الإقامة والفيزا نفسها؟",
+      "lang": "ar",
+      "expect": [
+        "Residence Permit",
+        "الإقامة",
+        "BRP",
+        "بطاقة"
+      ],
+      "hard": true
+    },
+    {
+      "q": "أبغى أعرف كم لازم يكون معي فلوس أول ما أوصل",
+      "lang": "ar",
+      "expect": [
+        "مكافأة",
+        "شهرين",
+        "مبلغ",
+        "ريال",
+        "باوند"
+      ],
+      "hard": true
+    },
+    {
+      "q": "الضمان المالي طلبوا مني مصاريف زيادة، وش هذي؟",
+      "lang": "ar",
+      "expect": [
+        "المصاريف المعملية",
+        "الضمان المالي",
+        "الملحقية",
+        "مصاريف"
+      ],
+      "hard": true
+    },
+    {
+      "q": "شريحة جوال أي شركة أحسن؟",
+      "lang": "ar",
+      "expect": [
+        "Giffgaff",
+        "شريحة",
+        "تجوال",
+        "جوال"
+      ],
+      "hard": true
+    },
+    {
+      "q": "التسجيل في العيادة يكلف شي؟",
+      "lang": "ar",
+      "expect": [
+        "التسجيل",
+        "مجان",
+        "تأمين",
+        "صحي"
+      ],
+      "hard": true
+    },
+    {
+      "q": "هل ينفع أشتغل وأنا على البعثة؟",
+      "lang": "ar",
+      "expect": [
+        "اشتغل",
+        "العمل",
+        "وظيفة",
+        "يحق لك العمل"
+      ],
+      "hard": true
+    },
+    {
+      "q": "أي اختبارات لغة يقبلونها غير الايلتس؟",
+      "lang": "ar",
+      "expect": [
+        "Trinity",
+        "SELT",
+        "UKVI",
+        "IELTS",
+        "اختبارات"
+      ],
+      "hard": true
+    },
+    {
+      "q": "Can I get my holding fee back if I cancel the room?",
+      "lang": "en",
+      "expect": [
+        "holding",
+        "ديبوزت",
+        "استرد",
+        "سكن"
+      ],
+      "hard": true
+    },
+    {
+      "q": "What should I sort out before I fly over?",
+      "lang": "en",
+      "expect": [
+        "قبل السفر",
+        "الجواز",
+        "ملف",
+        "سفير",
+        "التجوال"
+      ],
+      "hard": true
+    },
+    {
+      "q": "Is viewing a flat in person worth it versus photos?",
+      "lang": "en",
+      "expect": [
+        "الصور",
+        "تقييم",
+        "سكن",
+        "شقة"
+      ],
+      "hard": true
+    },
+    {
+      "q": "How long does the scholarship file take to open?",
+      "lang": "en",
+      "expect": [
+        "الملحقية",
+        "ملف",
+        "ايميل",
+        "سفير"
+      ],
+      "hard": true
     }
   ],
   "unanswerable": [
@@ -183,6 +319,21 @@
       "q": "كم راتب المبتعث في كندا لعام 2027؟",
       "lang": "ar",
       "why": "Canada, and a future year the archive cannot contain"
+    },
+    {
+      "q": "كم رسوم ضريبة المجلس (council tax) على الطلاب؟",
+      "lang": "ar",
+      "why": "Council tax never comes up in this archive - zero chunks mention it"
+    },
+    {
+      "q": "How do I convert my Saudi driving licence to a UK one?",
+      "lang": "en",
+      "why": "Driving licences are absent from the archive despite being a real UK student topic"
+    },
+    {
+      "q": "ما هي مواعيد عمل عيادات NHS في الإجازات؟",
+      "lang": "ar",
+      "why": "NHS appears in a single chunk and never with opening hours"
     }
   ]
 }
