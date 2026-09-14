@@ -1,6 +1,8 @@
-# CLAUDE.md
+# Architecture notes
 
-Guidance for Claude Code when working in this repository.
+Engineering notes for working in this repository: how the pipeline fits
+together, and the reasoning behind decisions that are not obvious from the
+code.
 
 ## Project
 

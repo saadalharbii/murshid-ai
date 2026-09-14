@@ -81,3 +81,6 @@ data/*.partial.npy
 data/*.partial.corpus
 eval/.embedding_cache.pkl
 eval/.answer_cache.json
+
+# Local editor/tooling config, not part of the project
+.claude/
