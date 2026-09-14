@@ -12,10 +12,10 @@ import numpy as np
 import pytest
 
 from ingest import corpus_fingerprint
-from murshid import config
+from murshid import __version__, config
 from murshid.messages import TROUBLE_AR, TROUBLE_EN, no_results, trouble
 from murshid.rag import detect_language
-from murshid.store import VectorStore
+from murshid.store import Document, VectorStore
 from murshid.telegram import TelegramParser
 
 
@@ -160,7 +160,7 @@ class TestRerankFallback:
         import numpy as np
 
         from murshid import rag
-        from murshid.store import VectorStore
+        from murshid.store import Document, VectorStore
 
         store = VectorStore(
             vectors=np.array([[1.0, 0.0], [0.0, 1.0], [0.7, 0.7]], dtype=np.float32),
@@ -375,3 +375,38 @@ class TestAnswerCacheKey:
 
         assert cache_key("q") == cache_key("q")
         assert cache_key("q") != cache_key("other")
+
+
+class TestDeployCompatibility:
+    """Guard against a redeploy breaking sessions that are already open.
+
+    Streamlit keeps Document objects in st.session_state across a redeploy,
+    and @st.cache_resource holds a pipeline keyed on __version__. A field
+    added to Document therefore reaches the renderer as a missing attribute on
+    old objects. This crashed the live app once; both halves are tested here.
+    """
+
+    def test_version_changes_when_document_gains_a_field(self):
+        # A tripwire, not a rule: if Document's shape changes, __version__ has
+        # to change with it so the cached pipeline is discarded on deploy.
+        assert Document.__slots__ == ("content", "metadata", "score", "score_kind"), (
+            "Document changed shape - bump murshid.__version__ so Streamlit "
+            "discards its cached pipeline, then update this test."
+        )
+        assert __version__ == "2.3.0"
+
+    def test_score_kind_defaults_for_documents_built_without_it(self):
+        # Positional construction is what the old cached code did.
+        document = Document("text", {}, 0.5)
+        assert document.score_kind == "similarity"
+
+    def test_renderer_tolerates_a_document_missing_score_kind(self):
+        class LegacyDocument:
+            """A Document as pickled before score_kind existed."""
+
+            def __init__(self):
+                self.content = "text"
+                self.metadata = {}
+                self.score = 0.5
+
+        assert getattr(LegacyDocument(), "score_kind", "similarity") == "similarity"

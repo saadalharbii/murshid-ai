@@ -66,9 +66,13 @@ def render_sources(sources) -> None:
     with st.expander(f"📚 Sources ({len(sources)})"):
         for i, source in enumerate(sources, 1):
             excerpt = source.content[:400] + ("..." if len(source.content) > 400 else "")
+            # Read defensively: st.session_state keeps Document objects from
+            # earlier in the session, which may predate a field added by a
+            # redeploy. Rendering history must never crash the whole page.
+            kind = getattr(source, "score_kind", "similarity")
             st.markdown(
                 f'<div class="source-card">{excerpt}'
-                f'<div class="source-meta">#{i} · {source.score_kind} '
+                f'<div class="source-meta">#{i} · {kind} '
                 f'{source.score:.0%} · '
                 f'{source.metadata.get("authors", "unknown")}</div></div>',
                 unsafe_allow_html=True,
