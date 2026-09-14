@@ -7,7 +7,7 @@ import sys
 import streamlit as st
 
 from murshid import __version__, config
-from murshid.messages import no_results, trouble
+from murshid.messages import no_results, source_authors, source_date, trouble
 from murshid.rag import RAGPipeline, detect_language
 
 EXAMPLES = [
@@ -60,21 +60,45 @@ def directional(text: str, language: str) -> str:
     return f'<div class="{"rtl" if language == "arabic" else "ltr"}">\n\n{text}\n\n</div>'
 
 
-def render_sources(sources) -> None:
+_EXCERPT_CHARS = 400
+
+
+def _excerpt(text: str) -> str:
+    """Trim to a readable length on a word boundary.
+
+    A hard character cut lands mid-word, and in a passage that answers the
+    question the cut often removes the answer. Backing up to the last space
+    costs a few characters and reads as a deliberate excerpt.
+    """
+    if len(text) <= _EXCERPT_CHARS:
+        return text
+    clipped = text[:_EXCERPT_CHARS]
+    spaced = clipped.rsplit(" ", 1)[0]
+    return (spaced if len(spaced) > _EXCERPT_CHARS * 0.7 else clipped) + "..."
+
+
+def render_sources(sources, language: str) -> None:
+    """Show the passages the answer was written from.
+
+    The citations in the answer are only worth something if the reader can
+    check them, so this panel is built around what helps them judge a passage:
+    when it was said, and by how many people. The rerank score is deliberately
+    not shown - it is an internal ranking number on a scale no reader knows,
+    and dressing it up as a percentage implies a precision it does not have.
+    """
     if not sources:
         return
-    with st.expander(f"📚 Sources ({len(sources)})"):
+
+    label = "المصادر" if language == "arabic" else "Sources"
+    with st.expander(f"📚 {label} ({len(sources)})"):
         for i, source in enumerate(sources, 1):
-            excerpt = source.content[:400] + ("..." if len(source.content) > 400 else "")
-            # Read defensively: st.session_state keeps Document objects from
-            # earlier in the session, which may predate a field added by a
-            # redeploy. Rendering history must never crash the whole page.
-            kind = getattr(source, "score_kind", "similarity")
+            metadata = source.metadata
+            date = source_date(metadata.get("date_range", ""), language)
+            who = source_authors(metadata.get("authors", ""), language)
+            meta = " · ".join(part for part in (f"#{i}", date, who) if part)
             st.markdown(
-                f'<div class="source-card">{excerpt}'
-                f'<div class="source-meta">#{i} · {kind} '
-                f'{source.score:.0%} · '
-                f'{source.metadata.get("authors", "unknown")}</div></div>',
+                f'<div class="source-card">{_excerpt(source.content)}'
+                f'<div class="source-meta">{meta}</div></div>',
                 unsafe_allow_html=True,
             )
 
@@ -129,7 +153,7 @@ def main() -> None:
         with st.chat_message(message["role"]):
             st.markdown(directional(message["content"], message["language"]), unsafe_allow_html=True)
             if message["role"] == "assistant":
-                render_sources(message.get("sources", []))
+                render_sources(message.get("sources", []), message["language"])
 
     question = st.chat_input("Ask in Arabic or English...") or st.session_state.pop("pending", None)
 
@@ -182,7 +206,7 @@ def main() -> None:
 
         text = "".join(parts).strip()
         placeholder.markdown(directional(text, language), unsafe_allow_html=True)
-        render_sources(sources)
+        render_sources(sources, language)
 
     st.session_state.messages.append(
         {"role": "assistant", "content": text, "sources": sources, "language": language}

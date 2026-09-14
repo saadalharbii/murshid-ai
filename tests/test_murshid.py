@@ -13,7 +13,14 @@ import pytest
 
 from ingest import corpus_fingerprint
 from murshid import __version__, config
-from murshid.messages import TROUBLE_AR, TROUBLE_EN, no_results, trouble
+from murshid.messages import (
+    TROUBLE_AR,
+    TROUBLE_EN,
+    no_results,
+    source_authors,
+    source_date,
+    trouble,
+)
 from murshid.rag import detect_language
 from murshid.store import Document, VectorStore
 from murshid.telegram import TelegramParser
@@ -410,3 +417,36 @@ class TestDeployCompatibility:
                 self.score = 0.5
 
         assert getattr(LegacyDocument(), "score_kind", "similarity") == "similarity"
+
+
+class TestSourceDisplay:
+    """The sources panel exists so a reader can check a citation.
+
+    That makes its job showing what helps them judge a passage - when it was
+    said, and by whom - rather than what the retrieval pipeline did.
+    """
+
+    def test_date_reduces_to_month_and_year(self):
+        stamp = "03.08.2019 10:42:52 UTC+00:00 to 03.08.2019 10:48:38 UTC+00:00"
+        assert source_date(stamp, "english") == "August 2019"
+
+    def test_date_is_localised(self):
+        stamp = "03.08.2019 10:42:52 UTC+00:00"
+        assert source_date(stamp, "arabic") == "أغسطس 2019"
+
+    def test_unparseable_date_yields_nothing_rather_than_junk(self):
+        for bad in ("", "not a date", "2019"):
+            assert source_date(bad, "english") == ""
+
+    def test_deleted_accounts_become_a_count(self):
+        # Two thirds of chunks are "Deleted Account"; printing it is noise.
+        assert source_authors("Deleted Account", "english") == "a student"
+        assert source_authors("Deleted Account, Deleted Account", "english") == "2 students"
+
+    def test_real_names_are_shown_with_a_remainder(self):
+        result = source_authors("Deleted Account, Tariq, Zainab", "english")
+        assert result.startswith("Tariq, Zainab")
+        assert "Deleted Account" not in result
+
+    def test_no_authors_yields_nothing(self):
+        assert source_authors("", "english") == ""
