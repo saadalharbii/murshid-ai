@@ -18,6 +18,7 @@ from pathlib import Path
 
 from murshid import config
 from murshid.embeddings import EmbeddingError, embed_documents
+from murshid.filters import drop_empty_chunks, drop_filler
 from murshid.scrub import contains_contact_details
 from murshid.store import VectorStore
 from murshid.telegram import TelegramParser
@@ -64,8 +65,15 @@ def main() -> int:
         print("error: no messages found", file=sys.stderr)
         return 1
 
-    chunks = TelegramParser().chunk(messages, config.CHUNK_SIZE, config.CHUNK_OVERLAP)
-    print(f"  {len(messages):,} messages -> {len(chunks):,} chunks")
+    # Filler is dropped before chunking so it does not pad the character
+    # budget and split real exchanges apart; empty chunks are dropped after,
+    # once it is clear whether a conversation ever produced an answer.
+    kept = drop_filler(messages)
+    chunks = drop_empty_chunks(
+        TelegramParser().chunk(kept, config.CHUNK_SIZE, config.CHUNK_OVERLAP)
+    )
+    print(f"  {len(messages):,} messages -> {len(kept):,} after filler "
+          f"-> {len(chunks):,} chunks")
 
     # The parser scrubs contact details, but the index is committed and public,
     # so a redaction bug must stop the build rather than ship quietly.

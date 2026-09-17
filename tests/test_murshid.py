@@ -21,6 +21,12 @@ from murshid.messages import (
     source_date,
     trouble,
 )
+from murshid.filters import (
+    drop_filler,
+    is_filler,
+    is_question_only,
+    keep_chunk,
+)
 from murshid.rag import detect_language
 from murshid.scrub import contains_contact_details, scrub
 from murshid.store import Document, VectorStore
@@ -519,3 +525,61 @@ class TestScrub:
 
     def test_empty_text_is_handled(self):
         assert scrub("") == ""
+
+
+class TestFilters:
+    """Filler and answerless chunks are dropped before embedding.
+
+    Both filters are conservative on purpose: dropping a short chunk that did
+    hold an answer costs more than keeping some filler, so these tests pin the
+    boundary in both directions.
+    """
+
+    @pytest.mark.parametrize(
+        "text",
+        ["شكرا", "تمام", "لا", "ايه", "السلام عليكم", "...", "🙏", "تمام شكرا", "ok"],
+    )
+    def test_filler_is_detected(self, text):
+        assert is_filler(text)
+
+    @pytest.mark.parametrize(
+        "text",
+        [
+            "البنك يطلب اثبات عنوان وتقدر تجيبه من الجامعة",
+            "تكلفة المعيشة في لندن حوالي ١٤ الف باوند بالسنة",
+            "يحتاج قبول جامعي وشهادة ايلتس 6.5",
+        ],
+    )
+    def test_content_is_kept(self, text):
+        assert not is_filler(text)
+
+    def test_question_without_an_answer_is_dropped(self):
+        chunk = "K: ايش افضل بنك بريطاني؟ وايش متطلباته لفتح الحساب"
+        assert is_question_only(chunk)
+        assert not keep_chunk({"content": chunk})
+
+    def test_question_with_an_answer_is_kept(self):
+        chunk = (
+            "K: ايش افضل بنك بريطاني؟\n"
+            "S: مونزو الاسهل للمبتعثين الجدد وما يطلبون الا البي ار بي وعنوان السكن"
+        )
+        assert not is_question_only(chunk)
+        assert keep_chunk({"content": chunk})
+
+    def test_statement_without_a_question_is_kept(self):
+        chunk = "S: تكلفة المعيشة في لندن حوالي ١٤ الف باوند بالسنة وتزيد بالوسط"
+        assert not is_question_only(chunk)
+        assert keep_chunk({"content": chunk})
+
+    def test_chunk_of_only_short_lines_is_dropped(self):
+        assert not keep_chunk({"content": "A: تمام\nB: ايه\nC: صح"})
+
+    def test_drop_filler_preserves_order_and_content(self):
+        messages = [
+            {"content": "شكرا"},
+            {"content": "البنك يطلب اثبات عنوان من الجامعة او فاتورة"},
+            {"content": "تمام"},
+        ]
+        kept = drop_filler(messages)
+        assert len(kept) == 1
+        assert kept[0]["content"].startswith("البنك")
