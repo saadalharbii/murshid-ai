@@ -4,9 +4,9 @@ A bilingual (Arabic/English) chatbot that answers questions about studying in
 the UK, grounded in an archive of real discussions between Saudi scholarship
 students on Telegram.
 
-Ask a question in either language. MurshidAI searches ~4,600 archived messages,
-picks the passages that actually answer it, and has Claude write a reply that
-cites them — using only what it found, never its own general knowledge.
+Ask a question in either language. MurshidAI searches the archive, picks the
+passages that actually answer it, and has Claude write a reply that cites them
+— using only what it found, never its own general knowledge.
 
 ## How it works
 
@@ -30,8 +30,15 @@ passages that echo the question over ones that answer it, and a wider net gives
 it more of those to pick from.
 
 Embeddings are computed once by `ingest.py` and committed as `data/index.npz`
-(934 passages, ~4 MB), so the app just loads an array and does a matrix
+(594 passages, ~2 MB), so the app just loads an array and does a matrix
 multiply. No vector database, no local ML model, nothing to keep online.
+
+Not every message makes it in. Acknowledgements ("thanks", "yes") are dropped
+before chunking, and a chunk that asks a question without ever answering it is
+dropped after — those match a user's question closely, since a query is a
+question too, and then supply nothing to answer from. Filtering cut the index
+by 36% and moved reranking from slightly behind plain vector search to slightly
+ahead of it.
 
 ## Running it
 

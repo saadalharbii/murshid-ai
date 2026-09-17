@@ -34,6 +34,8 @@ is used instead - a worse answer beats none.
 
 - `murshid/config.py` - settings from environment
 - `murshid/telegram.py` - HTML export parser and conversation-aware chunker
+- `murshid/scrub.py` - redacts contact details at parse time
+- `murshid/filters.py` - drops filler messages and answerless chunks
 - `murshid/embeddings.py` - Voyage AI client
 - `murshid/claude.py` - Anthropic Messages API client
 - `murshid/store.py` - numpy vector store
@@ -70,6 +72,22 @@ has both `httpx` and `httpx2` installed.
   no external dependencies. Rebuild and re-commit it when the corpus changes.
 - Voyage's free tier allows 3 requests/minute, so `ingest.py` rate-limits and
   checkpoints; a re-run resumes rather than restarting.
+
+## Ingestion
+
+`ingest.py` runs parse -> scrub -> filter -> chunk -> embed. Two of those steps
+exist because of measurement rather than taste:
+
+- **scrub** removes phone numbers, handles, emails and invite links. It has to
+  happen at parse time: the sources panel renders retrieved chunk text
+  directly, so anything in the index is on the page, and the system prompt
+  never sees it. `ingest.py` refuses to write an index if any chunk still
+  holds contact details.
+- **filter** drops acknowledgements before chunking and answerless chunks
+  after. 19% of chunks were a question with no reply in them; they score well
+  against a user's question precisely because they are questions, and then
+  contribute nothing. Removing them is what moved reranking ahead of plain
+  vector search on the eval.
 
 ## Data and privacy
 
