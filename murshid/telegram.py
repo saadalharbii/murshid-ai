@@ -1,5 +1,8 @@
 """Parser for Telegram Desktop HTML exports.
 
+Message text is scrubbed of contact details as it is parsed - see `scrub.py`
+for why that happens here rather than downstream.
+
 Chunking is conversation-aware rather than a fixed character budget. A plain
 500-character split produced chunks averaging 7.4 messages from 3.8 different
 authors, so every chunk was a blend of unrelated topics and looked vaguely
@@ -15,6 +18,8 @@ from pathlib import Path
 from typing import Any
 
 from bs4 import BeautifulSoup
+
+from .scrub import scrub
 
 _WHITESPACE = re.compile(r"\s+")
 _REPLY_TARGET = re.compile(r"go_to_message(\d+)")
@@ -73,6 +78,12 @@ class TelegramParser:
         content = _WHITESPACE.sub(" ", text_div.get_text(separator="\n", strip=True)).strip()
         if not content:
             return None
+
+        # Redact contact details here, at the single point where message text
+        # enters the system. Everything downstream - chunks, embeddings, the
+        # committed index, the sources panel - then works from scrubbed text
+        # by construction rather than by remembering to filter later.
+        content = scrub(content)
 
         author_div = div.find("div", class_="from_name")
         date_div = div.find("div", class_="date")

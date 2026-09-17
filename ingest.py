@@ -18,6 +18,7 @@ from pathlib import Path
 
 from murshid import config
 from murshid.embeddings import EmbeddingError, embed_documents
+from murshid.scrub import contains_contact_details
 from murshid.store import VectorStore
 from murshid.telegram import TelegramParser
 
@@ -65,6 +66,15 @@ def main() -> int:
 
     chunks = TelegramParser().chunk(messages, config.CHUNK_SIZE, config.CHUNK_OVERLAP)
     print(f"  {len(messages):,} messages -> {len(chunks):,} chunks")
+
+    # The parser scrubs contact details, but the index is committed and public,
+    # so a redaction bug must stop the build rather than ship quietly.
+    leaked = [c for c in chunks if contains_contact_details(c["content"])]
+    if leaked:
+        print(f"error: {len(leaked)} chunks still contain contact details after "
+              f"scrubbing - refusing to build an index. First offender:\n"
+              f"  {leaked[0]['content'][:200]}", file=sys.stderr)
+        return 1
 
     # Embedding is checkpointed so an interrupted run resumes instead of
     # restarting. The checkpoint is only valid for the exact corpus that

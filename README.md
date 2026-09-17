@@ -80,8 +80,14 @@ question can surface an Arabic passage and the other way round.
 ## Data
 
 The archive comes from a public Saudi student Telegram group. This repo
-includes five sample export files, chosen because they contain no phone numbers
-or usernames, so ingestion is reproducible.
+includes sample export files so ingestion is reproducible.
+
+Phone numbers, Telegram handles, email addresses and invite links are stripped
+from every message as it is parsed, and replaced with placeholders like
+`[phone]`. It happens at parse time rather than later because the sources panel
+shows retrieved text directly, so anything reaching the index reaches the page.
+`ingest.py` refuses to build an index if any chunk still contains contact
+details.
 
 Answers reflect what students told each other, not official guidance. The
 assistant is told to say so on official matters, to flag stale advice, and to

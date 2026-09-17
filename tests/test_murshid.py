@@ -22,6 +22,7 @@ from murshid.messages import (
     trouble,
 )
 from murshid.rag import detect_language
+from murshid.scrub import contains_contact_details, scrub
 from murshid.store import Document, VectorStore
 from murshid.telegram import TelegramParser
 
@@ -450,3 +451,71 @@ class TestSourceDisplay:
 
     def test_no_authors_yields_nothing(self):
         assert source_authors("", "english") == ""
+
+
+class TestScrub:
+    """Contact details are removed before anything is indexed.
+
+    The sources panel renders retrieved chunk text directly, so a phone number
+    that reaches the index reaches the page - the system prompt never sees it.
+    Redaction therefore happens at parse time, and these tests pin both halves:
+    what must be removed, and what must survive.
+    """
+
+    @pytest.mark.parametrize(
+        "text",
+        [
+            "رقمي 0501234567",
+            "call me on 07397789352",
+            "الرقم +966540395541",
+            "hotline 00442079173000",
+            "تواصل @alhafh",
+            "t.me/ukstudents/296251",
+            "https://t.me/joinchat/AAAA",
+            "mail me at test.user@gmail.com",
+        ],
+    )
+    def test_contact_details_are_removed(self, text):
+        assert not contains_contact_details(scrub(text))
+
+    @pytest.mark.parametrize(
+        "text",
+        [
+            "الجامعة تكلف 15000 باوند في السنة",
+            "درجة الايلتس 6.5",
+            "التقديم في 2024 والقبول 2025",
+            "السكن 850 شهريا",
+            "sort code 12345678",
+        ],
+    )
+    def test_ordinary_numbers_survive(self, text):
+        # Over-redaction destroys the retrievable content; years, prices and
+        # scores must pass through untouched.
+        assert scrub(text) == text
+
+    def test_placeholder_keeps_the_sentence_readable(self):
+        out = scrub("للتواصل مع السفارة 00442079173000 للاستفسار")
+        assert out == "للتواصل مع السفارة [phone] للاستفسار"
+
+    def test_email_is_not_mangled_into_a_handle(self):
+        # The @ inside an address would otherwise match the handle pattern and
+        # leave "[handle].com" behind, so emails are matched first.
+        assert scrub("a@b.com") == "[email]"
+
+    def test_parser_scrubs_on_the_way_in(self, tmp_path):
+        html = (
+            '<div class="message"><div class="from_name">S</div>'
+            '<div class="date" title="01.08.2019 10:00:00 UTC+00:00"></div>'
+            '<div class="text">رقمي 0501234567 وحسابي @someuser</div></div>'
+        )
+        path = tmp_path / "messages1.html"
+        path.write_text(html, encoding="utf-8")
+
+        messages = TelegramParser().parse_file(path)
+
+        assert len(messages) == 1
+        assert not contains_contact_details(messages[0]["content"])
+        assert "[phone]" in messages[0]["content"]
+
+    def test_empty_text_is_handled(self):
+        assert scrub("") == ""
