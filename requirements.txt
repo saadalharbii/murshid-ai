@@ -1,8 +1,13 @@
 # Runtime dependencies for the deployed Streamlit app.
-# Deliberately excludes torch / sentence-transformers: embeddings are computed
-# ahead of time by ingest.py, so the app only needs to search a numpy index.
+#
+# Every package here is installed on each cold start, so the list is kept to
+# what the running app actually imports. Deliberately excluded:
+#   torch / sentence-transformers - embeddings are precomputed by ingest.py
+#   beautifulsoup4 - only the parser needs it, and the app never parses HTML
+#   python-dotenv  - local convenience; Streamlit Cloud injects secrets as
+#                    environment variables, and config.py treats it as optional
+#
+# Install the ingestion extras with: pip install -r requirements-dev.txt
 streamlit>=1.40
 numpy>=1.26
-beautifulsoup4>=4.12
-python-dotenv>=1.0
 certifi>=2024.0

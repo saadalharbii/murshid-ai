@@ -7,6 +7,8 @@ calls are exercised by running the app.
 from __future__ import annotations
 
 import re
+import sys
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -17,9 +19,11 @@ from murshid.messages import (
     TROUBLE_AR,
     TROUBLE_EN,
     no_results,
+    searching,
     source_authors,
     source_date,
     trouble,
+    writing,
 )
 from murshid.filters import (
     drop_filler,
@@ -583,3 +587,72 @@ class TestFilters:
         kept = drop_filler(messages)
         assert len(kept) == 1
         assert kept[0]["content"].startswith("البنك")
+
+
+class TestStartupCost:
+    """The deployed app pays for every runtime dependency on each cold start.
+
+    Streamlit Cloud reinstalls requirements.txt when a container spins up, so
+    a package the running app never imports is time a visitor spends watching
+    a spinner. These tests pin the split between runtime and tooling deps.
+    """
+
+    def test_runtime_requirements_exclude_ingest_only_packages(self):
+        runtime = Path("requirements.txt").read_text().lower()
+        installed = [
+            line.split(">")[0].split("=")[0].strip()
+            for line in runtime.splitlines()
+            if line.strip() and not line.startswith("#")
+        ]
+        # bs4 is only needed to parse exports; dotenv only for local .env.
+        assert "beautifulsoup4" not in installed
+        assert "python-dotenv" not in installed
+        assert "torch" not in installed
+        assert "sentence-transformers" not in installed
+
+    def test_runtime_requirements_keep_what_the_app_imports(self):
+        installed = Path("requirements.txt").read_text().lower()
+        for package in ("streamlit", "numpy", "certifi"):
+            assert package in installed
+
+    def test_dev_requirements_include_the_ingest_extras(self):
+        dev = Path("requirements-dev.txt").read_text().lower()
+        assert "beautifulsoup4" in dev
+        assert "python-dotenv" in dev
+        assert "-r requirements.txt" in dev
+
+    def test_config_imports_without_dotenv(self, monkeypatch):
+        # Production installs no dotenv; config must still read real env vars.
+        import builtins
+
+        real_import = builtins.__import__
+
+        def blocked(name, *args, **kwargs):
+            if name.startswith("dotenv"):
+                raise ImportError("No module named 'dotenv'")
+            return real_import(name, *args, **kwargs)
+
+        monkeypatch.setattr(builtins, "__import__", blocked)
+        for module in [m for m in sys.modules if m.startswith("murshid.config")]:
+            monkeypatch.delitem(sys.modules, module, raising=False)
+        monkeypatch.setenv("VOYAGE_API_KEY", "from-environment")
+
+        import importlib
+
+        reloaded = importlib.import_module("murshid.config")
+        importlib.reload(reloaded)
+
+        assert reloaded.VOYAGE_API_KEY == "from-environment"
+
+
+class TestProgressMessages:
+    """Retrieval and generation are separate waits; each names its stage."""
+
+    def test_stage_messages_follow_the_question_language(self):
+        assert searching("arabic") != searching("english")
+        assert writing("arabic") != writing("english")
+
+    def test_stages_are_distinct(self):
+        # One unchanging spinner across both waits reads as a stall.
+        assert searching("english") != writing("english")
+        assert searching("arabic") != writing("arabic")

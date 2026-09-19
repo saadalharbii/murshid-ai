@@ -7,7 +7,14 @@ import sys
 import streamlit as st
 
 from murshid import __version__, config
-from murshid.messages import no_results, source_authors, source_date, trouble
+from murshid.messages import (
+    no_results,
+    searching,
+    source_authors,
+    source_date,
+    trouble,
+    writing,
+)
 from murshid.rag import RAGPipeline, detect_language
 
 EXAMPLES = [
@@ -171,7 +178,7 @@ def main() -> None:
         st.markdown(directional(question, language), unsafe_allow_html=True)
 
     with st.chat_message("assistant"):
-        with st.spinner("Searching the archive..."):
+        with st.spinner(searching(language)):
             _, sources, error = pipeline.retrieve(question)
 
         if error:
@@ -194,7 +201,21 @@ def main() -> None:
         placeholder = st.empty()
         parts: list[str] = []
         try:
-            for chunk in pipeline.stream_answer(question, language, sources):
+            stream = pipeline.stream_answer(question, language, sources)
+
+            # Generation takes a couple of seconds to produce its first token.
+            # Keep a spinner up for exactly that gap - an empty message box
+            # there reads as a stall - then let the text itself show progress.
+            with st.spinner(writing(language)):
+                first = next(stream, "")
+
+            if first:
+                parts.append(first)
+                placeholder.markdown(
+                    directional(first + " ▌", language), unsafe_allow_html=True
+                )
+
+            for chunk in stream:
                 parts.append(chunk)
                 placeholder.markdown(
                     directional("".join(parts) + " ▌", language), unsafe_allow_html=True

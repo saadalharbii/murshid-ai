@@ -24,6 +24,28 @@ def trouble(language: str) -> str:
     return TROUBLE_AR if language == "arabic" else TROUBLE_EN
 
 
+SEARCHING_AR = "أبحث في الأرشيف..."
+SEARCHING_EN = "Searching the archive..."
+
+WRITING_AR = "أصيغ الإجابة..."
+WRITING_EN = "Writing the answer..."
+
+
+def searching(language: str) -> str:
+    """Shown while retrieval runs."""
+    return SEARCHING_AR if language == "arabic" else SEARCHING_EN
+
+
+def writing(language: str) -> str:
+    """Shown after retrieval, while waiting on the first token.
+
+    Retrieval and generation are separate waits of a few seconds each. One
+    unchanging spinner across both reads as a stall; naming the current stage
+    shows the request is progressing.
+    """
+    return WRITING_AR if language == "arabic" else WRITING_EN
+
+
 def no_results(language: str) -> str:
     """Shown when retrieval succeeds but finds nothing relevant."""
     return NO_RESULTS_AR if language == "arabic" else NO_RESULTS_EN

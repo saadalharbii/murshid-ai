@@ -1,0 +1,6 @@
+# Everything in the deployed app, plus what ingest.py and the evals need.
+-r requirements.txt
+
+beautifulsoup4>=4.12
+python-dotenv>=1.0
+pytest>=8.0

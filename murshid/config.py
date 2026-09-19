@@ -3,9 +3,16 @@
 import os
 from pathlib import Path
 
-from dotenv import load_dotenv
+# python-dotenv is a local convenience only. On Streamlit Cloud the secrets
+# arrive as real environment variables, so the package need not be installed
+# there - and every package in requirements.txt is installed on each cold
+# start, which is time the user spends watching a spinner.
+try:
+    from dotenv import load_dotenv
 
-load_dotenv(Path(__file__).parent.parent / ".env")
+    load_dotenv(Path(__file__).parent.parent / ".env")
+except ImportError:
+    pass
 
 # Secrets
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
