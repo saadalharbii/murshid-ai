@@ -656,3 +656,36 @@ class TestProgressMessages:
         # One unchanging spinner across both waits reads as a stall.
         assert searching("english") != writing("english")
         assert searching("arabic") != writing("arabic")
+
+
+class TestYearRange:
+    """The sidebar states the archive's span, read from the index itself.
+
+    Hardcoding it guarantees it goes stale on the next resample, and a stated
+    date range that is quietly wrong is worse than showing none.
+    """
+
+    def _store(self, dates):
+        vectors = np.ones((len(dates), 4), dtype=np.float32)
+        contents = [f"chunk {i}" for i in range(len(dates))]
+        metadata = [{"date": d} for d in dates]
+        return VectorStore(vectors, contents, metadata)
+
+    def test_span_across_several_years(self):
+        store = self._store([
+            "01.08.2019 17:25:45 UTC+00:00",
+            "14.03.2022 09:00:00 UTC+00:00",
+            "30.10.2025 21:11:00 UTC+00:00",
+        ])
+        assert store.year_range() == (2019, 2025)
+
+    def test_single_year_collapses(self):
+        store = self._store(["01.08.2019 17:25:45 UTC+00:00"])
+        assert store.year_range() == (2019, 2019)
+
+    def test_unparseable_dates_are_skipped(self):
+        store = self._store(["", "not a date", "01.08.2021 10:00:00 UTC+00:00"])
+        assert store.year_range() == (2021, 2021)
+
+    def test_no_dates_returns_none(self):
+        assert self._store(["", "bad"]).year_range() is None

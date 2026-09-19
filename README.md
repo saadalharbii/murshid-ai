@@ -30,7 +30,7 @@ passages that echo the question over ones that answer it, and a wider net gives
 it more of those to pick from.
 
 Embeddings are computed once by `ingest.py` and committed as `data/index.npz`
-(594 passages, ~2 MB), so the app just loads an array and does a matrix
+(~2 MB for the sample committed here), so the app just loads an array and does a matrix
 multiply. No vector database, no local ML model, nothing to keep online.
 
 Not every message makes it in. Acknowledgements ("thanks", "yes") are dropped
@@ -86,8 +86,11 @@ question can surface an Arabic passage and the other way round.
 
 ## Data
 
-The archive comes from a public Saudi student Telegram group. This repo
-includes sample export files so ingestion is reproducible.
+The archive comes from a public Saudi student Telegram group spanning 2017 to
+2025. The full export is far too large to commit, so the repo carries an even
+sample across every year rather than a single block of months - a corpus drawn
+only from the newest files answers this year's questions and knows nothing
+about anything else.
 
 Phone numbers, Telegram handles, email addresses and invite links are stripped
 from every message as it is parsed, and replaced with placeholders like

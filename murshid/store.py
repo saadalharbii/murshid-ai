@@ -58,6 +58,24 @@ class VectorStore:
     def __len__(self) -> int:
         return len(self._contents)
 
+    def year_range(self) -> tuple[int, int] | None:
+        """Earliest and latest year in the indexed metadata.
+
+        Read from the index rather than hardcoded, so it stays honest when the
+        corpus is resampled - a stated date range that quietly goes stale is
+        worse than none.
+        """
+        years = []
+        for metadata in self._metadata:
+            stamp = str(metadata.get("date", ""))
+            parts = stamp.split(".")
+            if len(parts) >= 3:
+                try:
+                    years.append(int(parts[2].split()[0]))
+                except (ValueError, IndexError):
+                    continue
+        return (min(years), max(years)) if years else None
+
     @classmethod
     def load(cls, path: Path | None = None) -> "VectorStore":
         """Load the prebuilt index from disk."""

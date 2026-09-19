@@ -135,12 +135,19 @@ def main() -> None:
             "archive, and answered by Claude using only what was retrieved."
         )
         st.metric("Indexed passages", f"{len(pipeline.store):,}")
+
+        span = pipeline.store.year_range()
+        if span:
+            low, high = span
+            st.caption(
+                f"Covering {low}" if low == high else f"Covering {low}–{high}"
+            )
         st.caption(f"Claude: `{config.CLAUDE_MODEL}`\n\nEmbeddings: `{config.VOYAGE_MODEL}`")
         st.divider()
         st.caption(
-            "⚠️ Community discussions, not official guidance, and the archive "
-            "is not current. Visa, banking and NHS rules change - verify "
-            "anything important with your scholarship office."
+            "⚠️ Community discussions, not official guidance. Rules on visas, "
+            "banking and the NHS change over time, and passages carry their "
+            "date - verify anything important with your scholarship office."
         )
         if st.button("Clear conversation", use_container_width=True):
             st.session_state.messages = []
