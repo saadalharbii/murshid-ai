@@ -94,7 +94,13 @@ class TelegramParser:
             "metadata": {
                 "source": "telegram",
                 "chat_name": chat_name,
-                "author": author_div.get_text(strip=True) if author_div else last_author,
+                # Scrub the display name too: Telegram lets people use a
+                # handle as their name, and _render writes "Author: message",
+                # so an unscrubbed name is a contact detail inside the chunk
+                # text itself.
+                "author": scrub(author_div.get_text(strip=True))
+                if author_div
+                else last_author,
                 "date": date,
                 "timestamp": self._parse_date(date),
                 "message_id": div.get("id", ""),

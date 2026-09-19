@@ -689,3 +689,33 @@ class TestYearRange:
 
     def test_no_dates_returns_none(self):
         assert self._store(["", "bad"]).year_range() is None
+
+    def test_author_names_are_scrubbed_too(self, tmp_path):
+        # Telegram lets a display name be a handle, and _render writes
+        # "Author: message" - so an unscrubbed name is a contact detail inside
+        # the chunk text. The ingest guard caught 8 of these on a real corpus.
+        html = (
+            '<div class="message"><div class="from_name">@hadialamry</div>'
+            '<div class="date" title="01.08.2019 10:00:00 UTC+00:00"></div>'
+            '<div class="text">معهد نيو كولج كويس للمبتدئ وفيه دورات مكثفة</div></div>'
+        )
+        path = tmp_path / "messages1.html"
+        path.write_text(html, encoding="utf-8")
+
+        messages = TelegramParser().parse_file(path)
+        chunks = TelegramParser().chunk(messages)
+
+        assert messages[0]["metadata"]["author"] == "[handle]"
+        assert not contains_contact_details(chunks[0]["content"])
+
+    def test_ordinary_display_names_survive(self, tmp_path):
+        html = (
+            '<div class="message"><div class="from_name">Ahmed</div>'
+            '<div class="date" title="01.08.2019 10:00:00 UTC+00:00"></div>'
+            '<div class="text">الجامعة تطلب اثبات عنوان وشهادة اللغة</div></div>'
+        )
+        path = tmp_path / "messages1.html"
+        path.write_text(html, encoding="utf-8")
+
+        messages = TelegramParser().parse_file(path)
+        assert messages[0]["metadata"]["author"] == "Ahmed"
