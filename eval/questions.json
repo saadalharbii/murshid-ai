@@ -1,5 +1,5 @@
 {
-  "_comment": "Evaluation questions. `expect` lists substrings that a relevant chunk should contain; a question is satisfied when a retrieved chunk contains any of them (two, for chunks over 500 chars - see run_eval.is_relevant). This is cheaper to maintain than chunk-ID labels, which change on every re-index. Questions marked \"hard\": true are deliberately chosen to be losable - they paraphrase the archive rather than quoting it, or target a topic mentioned in only one or two chunks. The easy set saturated at recall@5 1.00, which hid regressions rather than proving quality; these exist so the metric can move. `unanswerable` holds questions the archive genuinely cannot answer. The \"near\" ones are UK student topics that simply never came up - a harder and more realistic decline than another country, which the wording alone gives away.",
+  "_comment": "Evaluation questions. `expect` lists substrings that a relevant chunk should contain; a question is satisfied when a retrieved chunk contains any of them (two, for chunks over 500 chars - see run_eval.is_relevant). This is cheaper to maintain than chunk-ID labels, which change on every re-index. Questions marked \"hard\": true are deliberately chosen to be losable - they paraphrase the archive rather than quoting it, or target a topic mentioned in only one or two chunks. The easy set saturated at recall@5 1.00, which hid regressions rather than proving quality; these exist so the metric can move. `unanswerable` holds questions the archive genuinely cannot answer. The \"near\" ones are UK student topics that simply never came up (re-verified against the 2017-2025 corpus - three earlier entries had to be replaced once the archive widened and began covering them) - a harder and more realistic decline than another country, which the wording alone gives away.",
   "questions": [
     {
       "q": "كيف أجدد تأشيرتي؟",
@@ -321,19 +321,19 @@
       "why": "Canada, and a future year the archive cannot contain"
     },
     {
-      "q": "كم رسوم ضريبة المجلس (council tax) على الطلاب؟",
+      "q": "كم يكلف تأمين السيارة للطلاب في بريطانيا؟",
       "lang": "ar",
-      "why": "Council tax never comes up in this archive - zero chunks mention it"
+      "why": "Car insurance never comes up across the sampled years - verified zero mentions"
     },
     {
-      "q": "How do I convert my Saudi driving licence to a UK one?",
+      "q": "How do I run for a student union election?",
       "lang": "en",
-      "why": "Driving licences are absent from the archive despite being a real UK student topic"
+      "why": "Student union politics is absent from the archive despite being a real campus topic"
     },
     {
-      "q": "ما هي مواعيد عمل عيادات NHS في الإجازات؟",
+      "q": "كيف أوثق عقد قران في بريطانيا؟",
       "lang": "ar",
-      "why": "NHS appears in a single chunk and never with opening hours"
+      "why": "Marriage documentation never appears in the archive"
     }
   ]
 }
