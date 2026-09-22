@@ -22,7 +22,6 @@ VOYAGE_API_KEY = os.getenv("VOYAGE_API_KEY", "")
 CLAUDE_MODEL = os.getenv("CLAUDE_MODEL", "claude-sonnet-5")
 VOYAGE_MODEL = os.getenv("VOYAGE_MODEL", "voyage-4-large")
 RERANK_MODEL = os.getenv("RERANK_MODEL", "rerank-2.5-lite")
-EMBEDDING_DIM = 1024
 
 # Retrieval. Vector search supplies the candidate pool and the reranker orders
 # it. The vector threshold stays low on purpose: cosine scores here sit close
@@ -59,7 +58,6 @@ RERANK_THRESHOLD = float(os.getenv("RERANK_THRESHOLD", "0.50"))
 QUERY_ATTEMPTS = int(os.getenv("QUERY_ATTEMPTS", "2"))
 QUERY_RATE_LIMIT_DELAY = float(os.getenv("QUERY_RATE_LIMIT_DELAY", "3.0"))
 CHUNK_SIZE = int(os.getenv("CHUNK_SIZE", "1200"))
-CHUNK_OVERLAP = int(os.getenv("CHUNK_OVERLAP", "0"))  # unused: chunks split on message boundaries
 
 # Paths
 INDEX_PATH = Path(__file__).parent.parent / "data" / "index.npz"

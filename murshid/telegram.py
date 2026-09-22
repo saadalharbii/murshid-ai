@@ -134,14 +134,14 @@ class TelegramParser:
         return messages
 
     def chunk(
-        self, messages: list[dict[str, Any]], size: int = _MAX_CHARS, overlap: int = 0
+        self, messages: list[dict[str, Any]], size: int = _MAX_CHARS
     ) -> list[dict[str, Any]]:
         """Group messages into chunks that follow conversation boundaries.
 
-        `overlap` is accepted and ignored: splitting on message boundaries
-        means no sentence is ever severed, which is the only thing the old
-        50-character overlap achieved. Retaining it would splice the tail of
-        one conversation onto the head of an unrelated one.
+        There is no character overlap between chunks: splitting on message
+        boundaries means no sentence is ever severed, which is the only thing
+        the old 50-character overlap achieved. Keeping it would splice the
+        tail of one conversation onto the head of an unrelated one.
         """
         if not messages:
             return []

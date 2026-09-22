@@ -102,8 +102,4 @@ def source_authors(authors: str, language: str) -> str:
 
     shown = ", ".join(real[:2])
     extra = len(names) - min(len(real), 2)
-    if extra <= 0:
-        return shown
-    if language == "arabic":
-        return f"{shown} +{extra}"
-    return f"{shown} +{extra}"
+    return shown if extra <= 0 else f"{shown} +{extra}"

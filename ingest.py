@@ -70,7 +70,7 @@ def main() -> int:
     # once it is clear whether a conversation ever produced an answer.
     kept = drop_filler(messages)
     chunks = drop_empty_chunks(
-        TelegramParser().chunk(kept, config.CHUNK_SIZE, config.CHUNK_OVERLAP)
+        TelegramParser().chunk(kept, config.CHUNK_SIZE)
     )
     print(f"  {len(messages):,} messages -> {len(kept):,} after filler "
           f"-> {len(chunks):,} chunks")
