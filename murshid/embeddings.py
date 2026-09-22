@@ -32,7 +32,13 @@ class EmbeddingError(RuntimeError):
     """Raised when the embedding API cannot be reached or returns an error."""
 
 
-def _post(texts: list[str], input_type: str, timeout: float) -> list[list[float]]:
+def _post(
+    texts: list[str],
+    input_type: str,
+    timeout: float,
+    attempts: int = 6,
+    rate_limit_delay: float = _RATE_LIMIT_DELAY,
+) -> list[list[float]]:
     """Embed a batch, mapping transport failures onto EmbeddingError.
 
     Retries and backoff live in `_http.post_json`, shared with the reranker,
@@ -47,8 +53,8 @@ def _post(texts: list[str], input_type: str, timeout: float) -> list[list[float]
             {"input": texts, "model": config.VOYAGE_MODEL, "input_type": input_type},
             {"Authorization": f"Bearer {config.VOYAGE_API_KEY}"},
             timeout=timeout,
-            attempts=6,
-            rate_limit_delay=_RATE_LIMIT_DELAY,
+            attempts=attempts,
+            rate_limit_delay=rate_limit_delay,
         )
     except urllib.error.HTTPError as exc:
         # User-facing text stays generic and vendor-neutral: an end user can
@@ -61,9 +67,15 @@ def _post(texts: list[str], input_type: str, timeout: float) -> list[list[float]
     return [item["embedding"] for item in body["data"]]
 
 
-def embed_query(text: str, timeout: float = 30.0) -> list[float]:
+def embed_query(text: str, timeout: float = 10.0) -> list[float]:
     """Embed a single user question."""
-    return _post([text], "query", timeout)[0]
+    return _post(
+        [text],
+        "query",
+        timeout,
+        attempts=config.QUERY_ATTEMPTS,
+        rate_limit_delay=config.QUERY_RATE_LIMIT_DELAY,
+    )[0]
 
 
 def embed_documents(

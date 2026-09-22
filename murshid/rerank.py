@@ -26,7 +26,7 @@ class RerankError(RuntimeError):
     """Raised when the rerank API cannot be reached or returns an error."""
 
 
-def rerank(query: str, documents: list[str], top_n: int, timeout: float = 30.0) -> list[tuple[int, float]]:
+def rerank(query: str, documents: list[str], top_n: int, timeout: float = 10.0) -> list[tuple[int, float]]:
     """Score `documents` against `query`.
 
     Returns (index, relevance_score) pairs, most relevant first, where index
@@ -51,9 +51,11 @@ def rerank(query: str, documents: list[str], top_n: int, timeout: float = 30.0) 
             payload,
             {"Authorization": f"Bearer {config.VOYAGE_API_KEY}"},
             timeout=timeout,
-            # The rerank endpoint has its own rate limit, so a 429 here means
-            # waiting out the window rather than failing the whole query.
-            attempts=3,
+            # Short and few: a failure here costs only the reranker's
+            # ordering, since the caller falls back to vector order, so
+            # waiting out a rate-limit window is not worth a stalled answer.
+            attempts=config.QUERY_ATTEMPTS,
+            rate_limit_delay=config.QUERY_RATE_LIMIT_DELAY,
         )
     except urllib.error.HTTPError as exc:
         raise RerankError(f"Voyage rerank returned {exc.code}") from exc

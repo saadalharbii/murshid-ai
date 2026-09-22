@@ -51,6 +51,13 @@ SIMILARITY_THRESHOLD = float(os.getenv("SIMILARITY_THRESHOLD", "0.0"))
 # excerpts do not cover a question; this threshold only trims the worst
 # matches before they reach it.
 RERANK_THRESHOLD = float(os.getenv("RERANK_THRESHOLD", "0.50"))
+# How many times a live question tries each search call. Kept low because
+# someone is watching a spinner: with the ingest-grade policy of six attempts
+# and waits growing by 21 seconds, a rate-limited question sat for over five
+# minutes before showing an error. Offline tools with no one waiting (the
+# evals) raise both rather than let a rate limit skew their numbers.
+QUERY_ATTEMPTS = int(os.getenv("QUERY_ATTEMPTS", "2"))
+QUERY_RATE_LIMIT_DELAY = float(os.getenv("QUERY_RATE_LIMIT_DELAY", "3.0"))
 CHUNK_SIZE = int(os.getenv("CHUNK_SIZE", "1200"))
 CHUNK_OVERLAP = int(os.getenv("CHUNK_OVERLAP", "0"))  # unused: chunks split on message boundaries
 

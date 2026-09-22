@@ -260,6 +260,53 @@ class TestEmbeddingErrorHandling:
         assert "no key" in error
 
 
+class TestRetryBudget:
+    """A live question gives up in seconds; ingest waits out rate limits.
+
+    They once shared a policy, and a rate-limited question sat for over five
+    minutes of sleeps before its error appeared.
+    """
+
+    @pytest.fixture
+    def rate_limited(self, monkeypatch):
+        import urllib.error
+
+        from murshid import _http
+
+        sleeps: list[float] = []
+
+        def always_429(request, **kwargs):
+            raise urllib.error.HTTPError(request.full_url, 429, "Too Many", {}, None)
+
+        monkeypatch.setattr(_http.urllib.request, "urlopen", always_429)
+        monkeypatch.setattr(_http.time, "sleep", sleeps.append)
+        monkeypatch.setattr(config, "VOYAGE_API_KEY", "test")
+        monkeypatch.setattr(config, "QUERY_ATTEMPTS", 2)
+        monkeypatch.setattr(config, "QUERY_RATE_LIMIT_DELAY", 3.0)
+        return sleeps
+
+    def test_query_embedding_gives_up_quickly(self, rate_limited):
+        from murshid.embeddings import EmbeddingError, embed_query
+
+        with pytest.raises(EmbeddingError):
+            embed_query("anything")
+        assert sum(rate_limited) <= 5
+
+    def test_rerank_gives_up_quickly(self, rate_limited):
+        from murshid.rerank import RerankError, rerank
+
+        with pytest.raises(RerankError):
+            rerank("anything", ["a", "b"], top_n=1)
+        assert sum(rate_limited) <= 5
+
+    def test_ingest_still_waits_out_the_limit(self, rate_limited):
+        from murshid.embeddings import EmbeddingError, embed_documents
+
+        with pytest.raises(EmbeddingError):
+            embed_documents(["a"])
+        assert sum(rate_limited) >= 60
+
+
 class TestRefusalDetection:
     """The answer eval decides whether Claude declined a question. Getting this
     wrong silently corrupts the metric, and it did during development: quoted

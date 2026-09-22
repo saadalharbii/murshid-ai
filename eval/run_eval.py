@@ -136,6 +136,13 @@ def main() -> int:
     parser.add_argument("--no-rerank", action="store_true", help="evaluate vector search alone")
     args = parser.parse_args()
 
+    # The app retries a question briefly because someone is waiting. Nobody
+    # waits on an eval, and a rate-limited call that gives up early would
+    # quietly score the vector-order fallback as if it were the reranker. Set
+    # here rather than at import, which the tests do.
+    config.QUERY_ATTEMPTS = 6
+    config.QUERY_RATE_LIMIT_DELAY = 21.0
+
     if args.no_rerank:
         results = {"vector only": evaluate(use_rerank=False)}
     else:
