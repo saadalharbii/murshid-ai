@@ -161,6 +161,27 @@ class TestVectorStore:
         assert loaded.search([1.0, 0.0], top_k=1)[0].content == "اختبار"
         assert loaded.search([0.0, 1.0], top_k=1)[0].metadata == {"a": 2}
 
+    def test_saves_half_precision_vectors_and_utf8_text(self, tmp_path):
+        # The index is committed, so its size is paid again on every rebuild.
+        path = VectorStore.save([[1.0, 0.0]], ["اختبار"], [{}], tmp_path / "index.npz")
+        data = np.load(path)
+        assert data["vectors"].dtype == np.float16
+        assert "اختبار".encode("utf-8") in data["corpus"].tobytes()
+
+    def test_loads_an_index_in_the_old_format(self, tmp_path):
+        # The committed index predates the compact format and must keep
+        # loading until it is rebuilt.
+        path = tmp_path / "index.npz"
+        np.savez_compressed(
+            path,
+            vectors=np.array([[1.0, 0.0], [0.0, 1.0]], dtype=np.float32),
+            contents=np.array(["اختبار", "test"]),
+            metadata=np.array(['{"a": 1}', '{"a": 2}']),
+        )
+        loaded = VectorStore.load(path)
+        assert loaded.search([0.0, 1.0], top_k=1)[0].content == "test"
+        assert loaded.search([0.0, 1.0], top_k=1)[0].metadata == {"a": 2}
+
     def test_rejects_mismatched_lengths(self):
         with pytest.raises(ValueError):
             VectorStore(np.array([[1.0, 0.0]]), ["a", "b"], [{}])

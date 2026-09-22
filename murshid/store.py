@@ -50,6 +50,10 @@ class VectorStore:
             raise ValueError("vectors, contents and metadata must be the same length")
 
         # Pre-normalise so cosine similarity is a single dot product per query.
+        # Widened to float32 first: the index is stored as float16, and
+        # normalising in half precision would round away the differences
+        # between scores that already sit close together.
+        vectors = np.asarray(vectors, dtype=np.float32)
         norms = np.linalg.norm(vectors, axis=1, keepdims=True)
         self._vectors = vectors / np.maximum(norms, 1e-12)
         self._contents = contents
@@ -87,10 +91,21 @@ class VectorStore:
             )
 
         data = np.load(path, allow_pickle=False)
+
+        if "corpus" not in data:
+            # Indexes written before the text moved into one UTF-8 blob.
+            # Kept readable so an old index still loads until it is rebuilt.
+            return cls(
+                vectors=data["vectors"],
+                contents=[str(c) for c in data["contents"]],
+                metadata=[json.loads(m) for m in data["metadata"]],
+            )
+
+        corpus = json.loads(data["corpus"].tobytes().decode("utf-8"))
         return cls(
             vectors=data["vectors"],
-            contents=[str(c) for c in data["contents"]],
-            metadata=[json.loads(m) for m in data["metadata"]],
+            contents=corpus["contents"],
+            metadata=corpus["metadata"],
         )
 
     @staticmethod
@@ -100,15 +115,24 @@ class VectorStore:
         metadata: list[dict],
         path: Path | None = None,
     ) -> Path:
-        """Write an index to disk, creating parent directories as needed."""
+        """Write an index to disk, creating parent directories as needed.
+
+        Stored for size, since the file is committed and every rebuild stays
+        in git history for good. Vectors are float16: on this corpus the top
+        10 results for 50 sampled queries were identical to float32, at half
+        the bytes - and zip compression barely touches float vectors, so
+        precision is the only lever. Text is one UTF-8 JSON blob rather than
+        numpy unicode arrays, which pad every string to the longest one at 4
+        bytes a character and held 4 MB of text in 104 MB.
+        """
         path = path or config.INDEX_PATH
         path.parent.mkdir(parents=True, exist_ok=True)
 
+        corpus = json.dumps({"contents": contents, "metadata": metadata}, ensure_ascii=False)
         np.savez_compressed(
             path,
-            vectors=np.asarray(vectors, dtype=np.float32),
-            contents=np.asarray(contents, dtype=object).astype("U"),
-            metadata=np.asarray([json.dumps(m, ensure_ascii=False) for m in metadata]),
+            vectors=np.asarray(vectors, dtype=np.float16),
+            corpus=np.frombuffer(corpus.encode("utf-8"), dtype=np.uint8),
         )
         return path
 
