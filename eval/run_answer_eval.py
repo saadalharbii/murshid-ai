@@ -275,19 +275,24 @@ def judge(record: dict, model: str) -> dict | None:
         f"Answer:\n{record['answer'] or '(no answer produced)'}"
     )
 
+    # The budget is far above the reply's ~30 tokens on purpose. Models that
+    # think before answering spend output tokens doing it, and at 200 an Opus
+    # judge was cut off mid-JSON on every question - each grade silently
+    # dropped, leaving a --judge run that printed no scores at all.
     try:
-        raw = complete(prompt, _JUDGE_SYSTEM, model=model, max_tokens=200)
+        raw = complete(prompt, _JUDGE_SYSTEM, model=model, max_tokens=2048)
     except ClaudeError as exc:
         print(f"  ! judge unavailable ({exc})", file=sys.stderr)
         return None
 
     match = re.search(r"\{.*\}", raw, re.DOTALL)
-    if not match:
-        return None
     try:
-        return json.loads(match.group())
+        if match:
+            return json.loads(match.group())
     except json.JSONDecodeError:
-        return None
+        pass
+    print(f"  ! judge reply had no scores: {raw[:80]!r}", file=sys.stderr)
+    return None
 
 
 def mean(values: list[float]) -> float:
