@@ -24,11 +24,6 @@ wheels/
 *.egg
 MANIFEST
 
-# Virtual environments
-venv/
-ENV/
-env/
-
 # Environment variables
 .env
 .env.local
@@ -45,8 +40,6 @@ env/
 # Logs
 *.log
 logs/
-app.log
-ingestion.log
 
 # Jupyter Notebook
 .ipynb_checkpoints
@@ -56,17 +49,8 @@ ingestion.log
 .coverage
 htmlcov/
 
-# Database
-*.db
-*.sqlite
-
-# Model cache (Sentence Transformers downloads models here)
-.cache/
-models/
-
 # OS
 Thumbs.db
-.DS_Store
 
 # Streamlit
 .streamlit/secrets.toml
