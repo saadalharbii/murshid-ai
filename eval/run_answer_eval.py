@@ -21,8 +21,8 @@ Three checks, in increasing order of cost:
     python eval/run_answer_eval.py --judge         # adds the LLM judge
     python eval/run_answer_eval.py --limit 5       # a quick subset
 
-Answers are cached to disk keyed by the question, the models, and the
-retrieval settings and the system prompts, so re-running to add the judge does
+Answers are cached to disk keyed by the question, the models, the retrieval
+settings, the system prompts and the index, so re-running to add the judge does
 not pay for generation twice while any change that can alter an answer
 invalidates the entry.
 
@@ -63,6 +63,7 @@ import hashlib
 import json
 import re
 import sys
+from functools import lru_cache
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -155,7 +156,28 @@ def cache_key(question: str) -> str:
     # are part of the identity too - hashed rather than inlined to keep the
     # key readable.
     prompts = hashlib.sha256((_SYSTEM_AR + _SYSTEM_EN).encode()).hexdigest()[:12]
-    return f"{settings}:{prompts}:{question}"
+    return f"{settings}:{prompts}:{index_fingerprint()}:{question}"
+
+
+def index_fingerprint() -> str:
+    """Identify the index answers were retrieved from.
+
+    Same reasoning as the settings: a rebuilt index retrieves different
+    passages, so answers cached against the old one are stale even when every
+    setting matches. Keyed on content rather than modification time, which a
+    checkout or a copy changes without changing a single vector.
+    """
+    path = config.INDEX_PATH
+    if not path.exists():
+        return "no-index"
+    stat = path.stat()
+    return _hash_file(str(path), stat.st_size, stat.st_mtime_ns)
+
+
+@lru_cache(maxsize=4)
+def _hash_file(path: str, size: int, mtime_ns: int) -> str:
+    """Hash a file once per version rather than once per question."""
+    return hashlib.sha256(Path(path).read_bytes()).hexdigest()[:12]
 
 
 def answer_question(pipeline: RAGPipeline, question: str, cache: dict) -> dict:

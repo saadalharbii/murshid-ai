@@ -456,6 +456,18 @@ class TestAnswerCacheKey:
         monkeypatch.setattr(harness, "_SYSTEM_EN", "a different prompt")
         assert harness.cache_key("q") != before
 
+    def test_key_changes_with_the_index(self, monkeypatch, tmp_path):
+        # A rebuilt index retrieves different passages, so answers cached
+        # against the old one must not be served as current.
+        from eval.run_answer_eval import cache_key
+
+        index = tmp_path / "index.npz"
+        index.write_bytes(b"old index")
+        monkeypatch.setattr(config, "INDEX_PATH", index)
+        before = cache_key("q")
+        index.write_bytes(b"rebuilt index")
+        assert cache_key("q") != before
+
     def test_same_settings_give_a_stable_key(self):
         from eval.run_answer_eval import cache_key
 
