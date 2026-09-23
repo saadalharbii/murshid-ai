@@ -201,6 +201,11 @@ def answer_question(pipeline: RAGPipeline, question: str, cache: dict) -> dict:
         "answer": answer,
         "source_count": len(sources),
         "sources": [d.content for d in sources],
+        # Exactly what the model saw, excerpt headers included, so the judge
+        # grades against the same evidence rather than a subset of it.
+        "prompt": pipeline._build_prompt(question, language=language, sources=sources)
+        if sources
+        else "",
     }
     cache[key] = record
     save_cache(cache)
@@ -272,7 +277,11 @@ def check_citations(record: dict) -> dict:
 
 _JUDGE_SYSTEM = """You grade a RAG assistant's answers. You are strict and terse.
 
-You receive numbered excerpts and an answer written from them. Score two axes
+You receive the prompt the assistant was given - numbered excerpts from Saudi
+students' Telegram group discussions, each headed with its authors and date -
+and the answer it wrote. The assistant was told the source is student chatter,
+and asked to flag old excerpts and unofficial advice, so dates taken from the
+headers and caveats of that kind are supported, not invented. Score two axes
 from 1 to 5:
 
 faithfulness - is every factual claim in the answer supported by the excerpts?
@@ -289,12 +298,16 @@ Reply with only a JSON object: {"faithfulness": n, "relevance": n, "note": "<10 
 
 def judge(record: dict, model: str) -> dict | None:
     """Ask Claude to grade faithfulness and relevance. Returns None on failure."""
-    excerpts = "\n\n".join(
+    # The judge must see the excerpt headers the assistant saw. Given only
+    # the bare text, it marked every date the assistant correctly read from a
+    # header as invented - the most common complaint across a full run, and
+    # one that penalised following the prompt's instruction to flag old
+    # advice.
+    given = record.get("prompt") or "\n\n".join(
         f"[{i}] {content}" for i, content in enumerate(record["sources"], 1)
-    )
+    ) + f"\n\nQuestion: {record['question']}"
     prompt = (
-        f"Excerpts:\n\n{excerpts}\n\n"
-        f"Question: {record['question']}\n\n"
+        f"Given to the assistant:\n\n{given}\n\n"
         f"Answer:\n{record['answer'] or '(no answer produced)'}"
     )
 
