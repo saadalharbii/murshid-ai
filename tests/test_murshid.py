@@ -763,7 +763,7 @@ class TestYearRange:
         # "Author: message" - so an unscrubbed name is a contact detail inside
         # the chunk text. The ingest guard caught 8 of these on a real corpus.
         html = (
-            '<div class="message"><div class="from_name">@hadialamry</div>'
+            '<div class="message"><div class="from_name">@someone_here</div>'
             '<div class="date" title="01.08.2019 10:00:00 UTC+00:00"></div>'
             '<div class="text">معهد نيو كولج كويس للمبتدئ وفيه دورات مكثفة</div></div>'
         )
