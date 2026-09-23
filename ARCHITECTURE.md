@@ -91,7 +91,8 @@ exist because of measurement rather than taste:
 
 ## Data and privacy
 
-`ChatExport_2025-10-26/` holds five sample export files, chosen because they
-contain no phone numbers or usernames. A `contacts/` directory of vcards with
+`ChatExport_2025-10-26/` holds 67 export files sampled evenly across 2017-2025.
+Contact details are redacted at parse time (see Ingestion above), so the index
+and the app never carry them. A `contacts/` directory of vcards with
 real names and phone numbers was removed in commit 2ddca47 and is gitignored -
 do not reintroduce it. Note that it remains present in commits before 2ddca47.
