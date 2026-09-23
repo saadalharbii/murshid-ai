@@ -101,6 +101,7 @@ _REFUSAL_MARKERS = (
     "ليس لدي",
     "لا أملك",
     "خارج نطاق",
+    "لا أستطيع",
     "لا تشمل",
     "do not contain",
     "don't contain",
@@ -119,6 +120,8 @@ _REFUSAL_MARKERS = (
     "do not cover",
     "outside what",
     "outside the scope",
+    "don't address",
+    "do not address",
 )
 
 
