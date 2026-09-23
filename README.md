@@ -30,7 +30,7 @@ passages that echo the question over ones that answer it, and a wider net gives
 it more of those to pick from.
 
 Embeddings are computed once by `ingest.py` and committed as `data/index.npz`
-(~2 MB for the sample committed here), so the app just loads an array and does a matrix
+(12,571 passages, ~26 MB), so the app just loads an array and does a matrix
 multiply. No vector database, no local ML model, nothing to keep online.
 
 Not every message makes it in. Acknowledgements ("thanks", "yes") are dropped
