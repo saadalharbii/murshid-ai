@@ -321,9 +321,9 @@
       "why": "Canada, and a future year the archive cannot contain"
     },
     {
-      "q": "كم يكلف تأمين السيارة للطلاب في بريطانيا؟",
+      "q": "كيف أتبرع بالدم في بريطانيا؟",
       "lang": "ar",
-      "why": "Car insurance never comes up across the sampled years - verified zero mentions"
+      "why": "Blood donation never comes up - zero mentions in the raw export, not just the index. Replaced car insurance, which two chunks do cover: a search for تأمين missed students writing تامين"
     },
     {
       "q": "How do I run for a student union election?",
@@ -333,7 +333,7 @@
     {
       "q": "كيف أوثق عقد قران في بريطانيا؟",
       "lang": "ar",
-      "why": "Marriage documentation never appears in the archive"
+      "why": "Marriage certificates appear only as visa paperwork; registering a marriage in the UK never comes up"
     }
   ]
 }
