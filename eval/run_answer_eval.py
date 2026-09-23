@@ -15,7 +15,8 @@ Three checks, in increasing order of cost:
               Free, and covers the failure that damages a demo most.
   judge       Claude grades faithfulness - is every claim supported by the
               excerpts - and relevance. Costs money, so it is opt-in via
-              --judge and defaults to Haiku.
+              --judge and defaults to Opus, a different model from the
+              one answering, so it is not grading its own work.
 
     python eval/run_answer_eval.py                 # free checks only
     python eval/run_answer_eval.py --judge         # adds the LLM judge
@@ -75,7 +76,7 @@ from murshid.rag import _SYSTEM_AR, _SYSTEM_EN, RAGPipeline  # noqa: E402
 QUESTIONS = Path(__file__).parent / "questions.json"
 CACHE = Path(__file__).parent / ".answer_cache.json"
 
-JUDGE_MODEL = "claude-haiku-4-5-20251001"
+JUDGE_MODEL = "claude-opus-5-5"
 
 _CITATION = re.compile(r"\[(\d+)\]")
 
