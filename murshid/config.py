@@ -19,10 +19,13 @@ ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
 VOYAGE_API_KEY = os.getenv("VOYAGE_API_KEY", "")
 
 # Models
-# Haiku over Sonnet, measured on the answer eval with an Opus judge: equal
-# relevance (4.57), higher faithfulness (3.39 against 3.00), and full answers
-# in about 6 seconds instead of 12. Sonnet's longer answers mostly added
-# claims the excerpts did not support.
+# Haiku over Sonnet for speed and cost, not quality. On the answer eval,
+# graded by Opus with the excerpt headers visible, Sonnet scored slightly
+# higher on the 18 questions both completed (faithfulness 3.50 against 3.28,
+# relevance 4.78 against 4.61). Haiku writes a full answer in about 6 seconds
+# instead of 12 and costs less per answer - the better trade for a demo
+# someone is watching. Set CLAUDE_MODEL=claude-sonnet-5 to switch back
+# without a code change.
 CLAUDE_MODEL = os.getenv("CLAUDE_MODEL", "claude-haiku-4-5-20251001")
 VOYAGE_MODEL = os.getenv("VOYAGE_MODEL", "voyage-4-large")
 RERANK_MODEL = os.getenv("RERANK_MODEL", "rerank-2.5-lite")
