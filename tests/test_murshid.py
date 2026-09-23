@@ -491,7 +491,7 @@ class TestDeployCompatibility:
             "Document changed shape - bump murshid.__version__ so Streamlit "
             "discards its cached pipeline, then update this test."
         )
-        assert __version__ == "2.5.0"
+        assert __version__ == "2.6.0"
 
     def test_score_kind_defaults_for_documents_built_without_it(self):
         # Positional construction is what the old cached code did.
