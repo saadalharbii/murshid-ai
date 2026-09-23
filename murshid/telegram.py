@@ -24,10 +24,18 @@ from .scrub import scrub
 _WHITESPACE = re.compile(r"\s+")
 _REPLY_TARGET = re.compile(r"go_to_message(\d+)")
 
-# A pause this long usually means the previous exchange finished. Measured on
-# this corpus: 3 minutes yields ~2.2 authors per chunk, while 10 minutes runs
-# back up to 3.0 and starts recreating the topic soup described above.
-_GAP = timedelta(minutes=3)
+# A pause this long usually means the previous exchange finished.
+#
+# Tuned twice. On the original single-year sample 3 minutes was right: it gave
+# ~2.2 authors per chunk where 10 minutes ran back up to 3.0. Widening the
+# corpus to nine years changed the answer - the group is far busier, so a
+# 3-minute window keeps merging unrelated threads and 28% of chunks ran over
+# 500 characters. A retrieval miss made it concrete: "how do I register with
+# the cultural mission" returned a passage about registering with the police,
+# because both sat in the same sprawling chunk. At 1 minute the same corpus
+# yields 47 short focused chunks on that topic, mean length drops from 407 to
+# 283, and long chunks fall to 14%.
+_GAP = timedelta(minutes=1)
 
 # How far back a reply may point and still count as continuing the current
 # conversation. 367 messages arriving after a pause reply into this window;
