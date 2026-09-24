@@ -32,6 +32,17 @@ restate the question rather than answer it, and a wider net gives it more of
 those to find. See the note in `config.py`. If reranking fails the vector order
 is used instead - a worse answer beats none.
 
+The same holds one step earlier. If the question cannot be embedded at all,
+keyword search (BM25 over words and 4-letter fragments, `murshid/lexical.py`)
+supplies the passages and Claude is told search is degraded, so a gap reads
+as "search is limited right now" rather than "the archive does not cover
+this". It is markedly weaker - 24 of 28 eval questions against Voyage's 28,
+and 6 of 10 in English - but it needs no service, so a Voyage outage costs
+answer quality instead of the whole app. Local embedding models were measured
+as a replacement for Voyage and rejected: the best one that fits Streamlit's
+1 GB (multilingual-e5-small) found relevant passages for 23 of 28 questions,
+6 of 10 in English, and returned spam for questions Voyage answers well.
+
 - `murshid/config.py` - settings from environment
 - `murshid/telegram.py` - HTML export parser and conversation-aware chunker
 - `murshid/scrub.py` - redacts contact details at parse time
@@ -41,6 +52,7 @@ is used instead - a worse answer beats none.
 - `murshid/store.py` - numpy vector store
 - `murshid/rag.py` - language detection, retrieval, prompting
 - `murshid/rerank.py` - Voyage reranker, with vector-order fallback
+- `murshid/lexical.py` - keyword search, the fallback when embedding fails
 - `eval/` - retrieval and answer-quality harnesses (see their docstrings)
 - `ingest.py` - builds `data/index.npz`
 - `streamlit_app.py` - chat interface

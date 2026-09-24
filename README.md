@@ -32,6 +32,8 @@ it more of those to pick from.
 Embeddings are computed once by `ingest.py` and committed as `data/index.npz`
 (12,571 passages, ~26 MB), so the app just loads an array and does a matrix
 multiply. No vector database, no local ML model, nothing to keep online.
+If the embedding service is unreachable, a built-in keyword search takes over,
+so an outage makes answers weaker rather than making the app fail.
 
 Not every message makes it in. Acknowledgements ("thanks", "yes") are dropped
 before chunking, and a chunk that asks a question without ever answering it is
