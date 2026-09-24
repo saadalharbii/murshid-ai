@@ -245,19 +245,75 @@ class TestRerankFallback:
 
 
 class TestEmbeddingErrorHandling:
-    def test_embedding_failure_is_reported_not_raised(self, monkeypatch):
+    """An embedding outage falls back to keyword search instead of failing."""
+
+    def _pipeline(self, monkeypatch, contents, rerank_calls=None):
         from murshid import rag
         from murshid.embeddings import EmbeddingError
 
         def failing(_):
             raise EmbeddingError("no key")
 
+        def rerank(*args, **kwargs):
+            if rerank_calls is not None:
+                rerank_calls.append(args)
+            return []
+
+        store = VectorStore(
+            np.ones((len(contents), 2), dtype=np.float32),
+            contents,
+            [{"n": i} for i in range(len(contents))],
+        )
         monkeypatch.setattr(rag, "embed_query", failing)
-        pipeline = rag.RAGPipeline(store=object())
-        _, sources, error = pipeline.retrieve("anything")
+        monkeypatch.setattr(rag, "rerank", rerank)
+        return rag.RAGPipeline(store=store)
+
+    def test_outage_falls_back_to_keyword_search(self, monkeypatch):
+        pipeline = self._pipeline(
+            monkeypatch, ["فتح حساب بنكي يحتاج عنوان سكن", "السكن الجامعي قريب من الحرم"]
+        )
+        _, sources, error = pipeline.retrieve("كيف أفتح حساب بنكي؟")
+
+        assert error is None
+        assert sources[0].content.startswith("فتح حساب بنكي")
+        assert sources[0].score_kind == "keyword"
+
+    def test_fallback_skips_the_reranker(self, monkeypatch):
+        # Reranking runs on the service that just failed; calling it would
+        # only make the reader wait out a second failure.
+        calls = []
+        pipeline = self._pipeline(monkeypatch, ["فتح حساب بنكي"], rerank_calls=calls)
+        pipeline.retrieve("حساب بنكي")
+        assert calls == []
+
+    def test_outage_with_no_keyword_match_is_reported(self, monkeypatch):
+        # The search that could have answered never ran, so this is an
+        # outage to report, not an archive with nothing to say.
+        pipeline = self._pipeline(monkeypatch, ["فتح حساب بنكي"])
+        _, sources, error = pipeline.retrieve("zzz")
 
         assert sources == []
         assert "no key" in error
+
+
+class TestDegradedPrompt:
+    """Fallback excerpts are a weaker search; a gap in them is not a gap in
+    the archive, and the model must not tell readers otherwise."""
+
+    def _prompt(self, kind, language):
+        from murshid.rag import RAGPipeline
+
+        pipeline = RAGPipeline.__new__(RAGPipeline)  # no store or thread needed
+        source = Document("text", {}, 1.0, kind)
+        return pipeline._build_prompt("q", [source], language)
+
+    def test_keyword_sources_carry_the_note(self):
+        assert "backup mode" in self._prompt("keyword", "english")
+        assert "احتياطي" in self._prompt("keyword", "arabic")
+
+    def test_normal_search_has_no_note(self):
+        assert "backup mode" not in self._prompt("relevance", "english")
+        assert "احتياطي" not in self._prompt("similarity", "arabic")
 
 
 class TestKeywordIndex:
@@ -287,7 +343,6 @@ class TestKeywordIndex:
         from murshid.lexical import KeywordIndex
 
         assert KeywordIndex(["موعد الفيزا"]).search("hello", top_k=5) == []
-
 
 
 class TestRetryBudget:
