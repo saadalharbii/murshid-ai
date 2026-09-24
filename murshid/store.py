@@ -20,11 +20,11 @@ from . import config
 class Document:
     """A retrieved chunk and its score against the query.
 
-    `score_kind` says what `score` means, because the two stages produce
-    different numbers on different scales: "similarity" is the cosine score
-    from vector search, "relevance" is the reranker's absolute score. They are
-    not comparable, so anything displaying or thresholding a score needs to
-    know which it holds.
+    `score_kind` says what `score` means, because each search produces
+    numbers on a different scale: "similarity" is the cosine score from vector
+    search, "relevance" is the reranker's absolute score, and "keyword" is
+    BM25 from the outage fallback. They are not comparable, so anything
+    displaying or thresholding a score needs to know which it holds.
     """
 
     __slots__ = ("content", "metadata", "score", "score_kind")
@@ -61,6 +61,18 @@ class VectorStore:
 
     def __len__(self) -> int:
         return len(self._contents)
+
+    @property
+    def contents(self) -> list[str]:
+        """Chunk texts in index order, for search methods other than vectors."""
+        return self._contents
+
+    def fetch(self, hits: list[tuple[int, float]], score_kind: str) -> list[Document]:
+        """Documents for (position, score) pairs from another search method."""
+        return [
+            Document(self._contents[i], self._metadata[i], score, score_kind)
+            for i, score in hits
+        ]
 
     def year_range(self) -> tuple[int, int] | None:
         """Earliest and latest year in the indexed metadata.

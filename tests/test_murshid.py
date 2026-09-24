@@ -260,6 +260,36 @@ class TestEmbeddingErrorHandling:
         assert "no key" in error
 
 
+class TestKeywordIndex:
+    def test_spelling_variants_match(self):
+        # Students write hamza and taa marbuta both ways; تأمين must find تامين.
+        from murshid.lexical import KeywordIndex
+
+        index = KeywordIndex(["سعر تامين السياره", "موعد الفيزا"])
+        assert index.search("كم تأمين السيارة؟", top_k=2)[0][0] == 0
+
+    def test_ranks_the_closer_match_first(self):
+        from murshid.lexical import KeywordIndex
+
+        index = KeywordIndex(
+            ["the bank wanted proof of address", "open a bank account with a BRP", "rent in London"]
+        )
+        assert index.search("open bank account", top_k=3)[0][0] == 1
+
+    def test_word_forms_match_through_fragments(self):
+        # افتح ("I open") and فتحت ("I opened") share no whole word.
+        from murshid.lexical import KeywordIndex
+
+        index = KeywordIndex(["فتحت حسابي في باركليز", "موعد الفيزا"])
+        assert index.search("كيف افتح حسابي", top_k=2)[0][0] == 0
+
+    def test_no_shared_words_returns_nothing(self):
+        from murshid.lexical import KeywordIndex
+
+        assert KeywordIndex(["موعد الفيزا"]).search("hello", top_k=5) == []
+
+
+
 class TestRetryBudget:
     """A live question gives up in seconds; ingest waits out rate limits.
 
