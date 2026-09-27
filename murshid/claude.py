@@ -30,20 +30,22 @@ def stream(
     model: str | None = None,
     max_tokens: int = 1024,
     timeout: float = 60.0,
+    temperature: float | None = None,
 ):
     """Yield Claude's reply incrementally, so callers can render as it arrives."""
     if not config.ANTHROPIC_API_KEY:
         raise ClaudeError("ANTHROPIC_API_KEY is not set. Add it to .env.")
 
-    payload = json.dumps(
-        {
-            "model": model or config.CLAUDE_MODEL,
-            "max_tokens": max_tokens,
-            "system": system,
-            "messages": [{"role": "user", "content": prompt}],
-            "stream": True,
-        }
-    ).encode()
+    body = {
+        "model": model or config.CLAUDE_MODEL,
+        "max_tokens": max_tokens,
+        "system": system,
+        "messages": [{"role": "user", "content": prompt}],
+        "stream": True,
+    }
+    if temperature is not None:
+        body["temperature"] = temperature
+    payload = json.dumps(body).encode()
 
     request = urllib.request.Request(
         _API_URL,
@@ -84,10 +86,21 @@ def complete(
     model: str | None = None,
     max_tokens: int = 1024,
     timeout: float = 60.0,
+    temperature: float | None = None,
 ) -> str:
     """Return Claude's full reply as a string.
 
-    The app itself streams; this exists for the offline evaluation harness,
-    which has no one to render to and simply needs the finished text.
+    For callers that need the finished text rather than a stream: the
+    evaluation harness, and the follow-up rewrite, whose output has to be
+    complete before the search it feeds can start.
     """
-    return "".join(stream(prompt, system, model=model, max_tokens=max_tokens, timeout=timeout))
+    return "".join(
+        stream(
+            prompt,
+            system,
+            model=model,
+            max_tokens=max_tokens,
+            timeout=timeout,
+            temperature=temperature,
+        )
+    )

@@ -316,6 +316,94 @@ class TestDegradedPrompt:
         assert "احتياطي" not in self._prompt("similarity", "arabic")
 
 
+class TestFollowUps:
+    """A follow-up is rewritten into a full question before it is searched."""
+
+    RENT = ("How much is rent in London?", "Around £900 a month for a room [1].")
+
+    @pytest.fixture
+    def calls(self, monkeypatch):
+        from murshid import rag
+
+        seen = []
+
+        def fake_complete(prompt, system, **kwargs):
+            seen.append(prompt)
+            return "How much is rent in Manchester?"
+
+        monkeypatch.setattr(rag, "complete", fake_complete)
+        return seen
+
+    def test_first_question_costs_no_call(self, calls):
+        from murshid.rag import standalone_question
+
+        assert standalone_question("How much is rent?", []) == "How much is rent?"
+        assert calls == []
+
+    def test_follow_up_is_searched_as_rewritten(self, calls):
+        from murshid.rag import standalone_question
+
+        rewritten = standalone_question("What about Manchester?", [self.RENT])
+        assert rewritten == "How much is rent in Manchester?"
+        assert "rent in London" in calls[0]
+        assert "What about Manchester?" in calls[0]
+
+    def test_rewrite_failure_searches_the_question_as_asked(self, monkeypatch):
+        from murshid import rag
+        from murshid.claude import ClaudeError
+
+        def failing(*args, **kwargs):
+            raise ClaudeError("down")
+
+        monkeypatch.setattr(rag, "complete", failing)
+        assert rag.standalone_question("What about Manchester?", [self.RENT]) == "What about Manchester?"
+
+    def test_blank_or_quoted_rewrite_is_cleaned(self, monkeypatch):
+        from murshid import rag
+
+        monkeypatch.setattr(rag, "complete", lambda *a, **k: "  ")
+        assert rag.standalone_question("and Leeds?", [self.RENT]) == "and Leeds?"
+
+        monkeypatch.setattr(rag, "complete", lambda *a, **k: '"Rent in Leeds?"')
+        assert rag.standalone_question("and Leeds?", [self.RENT]) == "Rent in Leeds?"
+
+    def test_explanations_after_the_question_are_dropped(self, monkeypatch):
+        from murshid import rag
+
+        reply = "How much is rent in Leeds?\n\nI rewrote this because the user refers to rent."
+        monkeypatch.setattr(rag, "complete", lambda *a, **k: reply)
+        assert rag.standalone_question("and Leeds?", [self.RENT]) == "How much is rent in Leeds?"
+
+        monkeypatch.setattr(rag, "complete", lambda *a, **k: "word " * 100)
+        assert rag.standalone_question("and Leeds?", [self.RENT]) == "and Leeds?"
+
+    def test_only_recent_turns_are_sent_without_citations(self, calls):
+        from murshid.rag import standalone_question
+
+        history = [("oldest question", "old answer"), self.RENT, ("second", "answer [2]")]
+        standalone_question("and Leeds?", history)
+        assert "oldest question" not in calls[0]
+        assert "[1]" not in calls[0] and "[2]" not in calls[0]
+
+    def test_exchanges_skip_questions_whose_answer_failed(self):
+        from murshid.rag import past_exchanges
+
+        messages = [
+            {"role": "user", "content": "q1"},
+            {"role": "assistant", "content": "a1"},
+            {"role": "user", "content": "q2"},  # errored, no reply stored
+            {"role": "user", "content": "q3"},
+            {"role": "assistant", "content": "a3"},
+        ]
+        assert past_exchanges(messages) == [("q1", "a1"), ("q3", "a3")]
+
+    def test_searched_note_follows_the_question_language(self):
+        from murshid.messages import searched_for
+
+        assert "Searched for" in searched_for("rent in Leeds", "english")
+        assert "بحثت عن" in searched_for("السكن في ليدز", "arabic")
+
+
 class TestKeywordIndex:
     def test_spelling_variants_match(self):
         # Students write hamza and taa marbuta both ways; تأمين must find تامين.

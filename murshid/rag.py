@@ -7,7 +7,7 @@ import sys
 import threading
 
 from . import config
-from .claude import stream
+from .claude import ClaudeError, complete, stream
 from .embeddings import EmbeddingError, embed_query
 from .lexical import KeywordIndex
 from .rerank import RerankError, rerank
@@ -60,6 +60,78 @@ _DEGRADED_EN = (
     "limited right now and suggest trying again shortly - do not say the "
     "archive lacks the topic.\n\n"
 )
+
+
+_REWRITE_SYSTEM = """You turn the latest message in a chat into a standalone search query for an archive of Saudi student discussions about studying in the UK.
+
+- If the latest message refers back to the chat - "what about Manchester?", "which one is cheapest?", "do they need a letter?", "is that per month?" - rewrite it as a complete question, replacing the reference with what it points to. Words like it, they, that, those, which one, there, هذا, هذي, ذلك, فيها, لها are references
+- Otherwise copy it back word for word, even if it is short or vague. Do not add places, details or clarifications to a question that does not refer back
+- Keep the language of the latest message
+- Reply with the question only: no explanation, no quotation marks"""
+
+# Enough history to resolve "what about X?" and "and the second one?". Older
+# turns rarely matter to the latest question and make the rewrite slower.
+_HISTORY_TURNS = 2
+_HISTORY_CHARS = 500
+_CITATION = re.compile(r"\s*\[\d+\]")
+_REWRITE_MAX_CHARS = 300
+
+
+def past_exchanges(messages: list[dict]) -> list[tuple[str, str]]:
+    """(question, answer) pairs from the chat log, oldest first.
+
+    A question whose answer failed has no reply after it and is skipped - the
+    reader saw an error, so there is nothing for a follow-up to refer to.
+    """
+    return [
+        (asked["content"], answered["content"])
+        for asked, answered in zip(messages, messages[1:])
+        if asked["role"] == "user" and answered["role"] == "assistant"
+    ]
+
+
+def standalone_question(question: str, history: list[tuple[str, str]]) -> str:
+    """Rewrite a follow-up so it can be searched without the conversation.
+
+    Retrieval sees one question at a time, so "what about Manchester?" after
+    a question about rent in London searches the archive for Manchester in
+    general. Claude rewrites it first - "how much is rent in Manchester?" -
+    and that is what gets searched and answered.
+
+    `history` holds earlier (question, answer) pairs, oldest first. With none
+    there is nothing to resolve, so the first question costs no extra call.
+    If the rewrite fails the question is used as asked: a follow-up searched
+    literally is a weaker answer, not a failed one.
+    """
+    if not history:
+        return question
+
+    turns = []
+    for asked, answered in history[-_HISTORY_TURNS:]:
+        # Citation markers mean nothing without the excerpts they pointed at.
+        answered = _CITATION.sub("", answered)[:_HISTORY_CHARS]
+        turns.append(f"User: {asked}\nAssistant: {answered}")
+    prompt = "\n\n".join(turns) + f"\n\nLatest message: {question}"
+
+    try:
+        # Temperature 0: the same conversation should search the same thing
+        # every time. At the default, a borderline follow-up like "is that per
+        # month?" was resolved on one run and left as typed on the next.
+        rewritten = complete(
+            prompt, _REWRITE_SYSTEM, max_tokens=200, timeout=10.0, temperature=0.0
+        )
+    except ClaudeError as exc:
+        print(f"rewrite failed ({exc}); searching the question as asked", file=sys.stderr)
+        return question
+
+    # The reply should be one question. Anything past the first line is the
+    # model explaining itself, and a reply far longer than any question is
+    # not a rewrite at all - searching either would be worse than the original.
+    lines = [line for line in rewritten.strip().splitlines() if line.strip()]
+    rewritten = lines[0].strip().strip('"«»“”') if lines else ""
+    if not rewritten or len(rewritten) > _REWRITE_MAX_CHARS:
+        return question
+    return rewritten
 
 
 def detect_language(text: str) -> str:

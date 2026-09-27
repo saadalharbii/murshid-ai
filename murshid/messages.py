@@ -51,6 +51,16 @@ def no_results(language: str) -> str:
     return NO_RESULTS_AR if language == "arabic" else NO_RESULTS_EN
 
 
+def searched_for(query: str, language: str) -> str:
+    """Shown under a follow-up's answer: the rewritten question that was searched.
+
+    The answer is written to the rewrite, not to the words the reader typed,
+    so when a rewrite misreads the conversation the reader can see why the
+    answer is off instead of being left to guess.
+    """
+    return f"🔎 بحثت عن: {query}" if language == "arabic" else f"🔎 Searched for: {query}"
+
+
 _MONTHS_AR = {
     1: "يناير", 2: "فبراير", 3: "مارس", 4: "أبريل", 5: "مايو", 6: "يونيو",
     7: "يوليو", 8: "أغسطس", 9: "سبتمبر", 10: "أكتوبر", 11: "نوفمبر", 12: "ديسمبر",

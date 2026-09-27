@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import html
 import sys
 
 import streamlit as st
@@ -9,13 +10,14 @@ import streamlit as st
 from murshid import __version__, config
 from murshid.messages import (
     no_results,
+    searched_for,
     searching,
     source_authors,
     source_date,
     trouble,
     writing,
 )
-from murshid.rag import RAGPipeline, detect_language
+from murshid.rag import RAGPipeline, detect_language, past_exchanges, standalone_question
 
 EXAMPLES = [
     "ما هي أفضل المدن للدراسة في بريطانيا؟",
@@ -45,6 +47,7 @@ st.markdown(
         unicode-bidi: plaintext;
       }
       .source-meta { opacity: 0.65; font-size: 0.78rem; margin-top: 0.4rem; }
+      .searched { opacity: 0.65; font-size: 0.8rem; unicode-bidi: plaintext; }
     </style>
     """,
     unsafe_allow_html=True,
@@ -82,6 +85,17 @@ def _excerpt(text: str) -> str:
     clipped = text[:_EXCERPT_CHARS]
     spaced = clipped.rsplit(" ", 1)[0]
     return (spaced if len(spaced) > _EXCERPT_CHARS * 0.7 else clipped) + "..."
+
+
+def render_searched(query: str | None, language: str) -> None:
+    """Show what a follow-up was rewritten to. Nothing for a first question."""
+    if query:
+        # Escaped: the rewrite echoes the reader's own words back into HTML.
+        text = html.escape(searched_for(query, language))
+        st.markdown(
+            f'<div class="searched {"rtl" if language == "arabic" else "ltr"}">{text}</div>',
+            unsafe_allow_html=True,
+        )
 
 
 def render_sources(sources, language: str) -> None:
@@ -167,6 +181,7 @@ def main() -> None:
         with st.chat_message(message["role"]):
             st.markdown(directional(message["content"], message["language"]), unsafe_allow_html=True)
             if message["role"] == "assistant":
+                render_searched(message.get("searched"), message["language"])
                 render_sources(message.get("sources", []), message["language"])
 
     question = st.chat_input("Ask in Arabic or English...") or st.session_state.pop("pending", None)
@@ -177,6 +192,7 @@ def main() -> None:
     # Alignment follows the question's language for the whole exchange, so a
     # reply peppered with English still reads right-to-left for Arabic askers.
     language = detect_language(question)
+    history = past_exchanges(st.session_state.messages)
 
     st.session_state.messages.append(
         {"role": "user", "content": question, "language": language}
@@ -186,7 +202,11 @@ def main() -> None:
 
     with st.chat_message("assistant"):
         with st.spinner(searching(language)):
-            _, sources, error = pipeline.retrieve(question)
+            # A follow-up like "what about Manchester?" is rewritten into a
+            # full question first, and that is what is searched and answered.
+            query = standalone_question(question, history)
+            _, sources, error = pipeline.retrieve(query)
+        searched = query if query.casefold() != question.casefold() else None
 
         if error:
             # The underlying message is for the logs; the reader gets a
@@ -198,8 +218,10 @@ def main() -> None:
         if not sources:
             text = no_results(language)
             st.markdown(directional(text, language), unsafe_allow_html=True)
+            render_searched(searched, language)
             st.session_state.messages.append(
-                {"role": "assistant", "content": text, "sources": [], "language": language}
+                {"role": "assistant", "content": text, "sources": [],
+                 "searched": searched, "language": language}
             )
             return
 
@@ -208,7 +230,7 @@ def main() -> None:
         placeholder = st.empty()
         parts: list[str] = []
         try:
-            stream = pipeline.stream_answer(question, language, sources)
+            stream = pipeline.stream_answer(query, language, sources)
 
             # Generation takes a couple of seconds to produce its first token.
             # Keep a spinner up for exactly that gap - an empty message box
@@ -234,10 +256,12 @@ def main() -> None:
 
         text = "".join(parts).strip()
         placeholder.markdown(directional(text, language), unsafe_allow_html=True)
+        render_searched(searched, language)
         render_sources(sources, language)
 
     st.session_state.messages.append(
-        {"role": "assistant", "content": text, "sources": sources, "language": language}
+        {"role": "assistant", "content": text, "sources": sources,
+         "searched": searched, "language": language}
     )
 
 
