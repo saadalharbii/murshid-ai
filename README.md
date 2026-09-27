@@ -21,6 +21,10 @@ question ─▶ embedding ─▶ search a prebuilt index ─▶ 10 candidates
                                               question's language
 ```
 
+Follow-ups work too. "What about Manchester?" after a question about London
+rent is rewritten into a full question before it is searched, and the app
+shows what it searched for.
+
 Retrieval runs in two stages because similarity scores in this corpus sit very
 close together — a single-stage search returns passages that all look about
 equally relevant. The second stage compares each candidate against the question

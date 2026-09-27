@@ -32,6 +32,17 @@ restate the question rather than answer it, and a wider net gives it more of
 those to find. See the note in `config.py`. If reranking fails the vector order
 is used instead - a worse answer beats none.
 
+Follow-ups are rewritten before any of this. Retrieval sees one question at a
+time, so "what about Manchester?" after a question about London rent would
+search for Manchester in general. When there is earlier conversation, Claude
+first turns the latest message into a standalone question (about 0.7s), and
+that is what is searched and answered; the app shows it under the answer. The
+rewrite prompt tells it to copy back anything that does not refer to the
+chat word for word - an earlier version helpfully added "in the UK" to
+standalone questions, which quietly changed their search results. A first
+question skips the call entirely, and a failed rewrite searches the question
+as typed.
+
 The same holds one step earlier. If the question cannot be embedded at all,
 keyword search (BM25 over words and 4-letter fragments, `murshid/lexical.py`)
 supplies the passages and Claude is told search is degraded, so a gap reads
