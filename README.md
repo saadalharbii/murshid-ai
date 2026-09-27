@@ -1,5 +1,7 @@
 # 🎓 MurshidAI · مرشد
 
+[![tests](https://github.com/saadalharbii/murshid-ai/actions/workflows/tests.yml/badge.svg)](https://github.com/saadalharbii/murshid-ai/actions/workflows/tests.yml)
+
 A bilingual (Arabic/English) chatbot that answers questions about studying in
 the UK, grounded in an archive of real discussions between Saudi scholarship
 students on Telegram.
@@ -41,6 +43,24 @@ dropped after — those match a user's question closely, since a query is a
 question too, and then supply nothing to answer from. Filtering cut the index
 by 36% and moved reranking from slightly behind plain vector search to slightly
 ahead of it.
+
+## How well it works
+
+Measured on a hand-written set of 28 questions the archive can answer (18
+Arabic, 10 English) and 8 it cannot:
+
+| Check | Result |
+|---|---|
+| Relevant passage in the top 5 | 28 / 28 (MRR 0.90, against 0.81 without reranking) |
+| Answered, with citations | 27 / 28 |
+| Citations pointing at a passage that doesn't exist | 0 |
+| Out-of-archive questions declined | 8 / 8 |
+| Relevant passage found during an embedding outage | 24 / 28 |
+
+The one miss is an English question about getting a room's holding fee back:
+the passages retrieved were about a different kind of fee, and the answer said
+so instead of stretching them. The set is small and written by me, so treat
+it as a regression check more than a benchmark.
 
 ## Running it
 
