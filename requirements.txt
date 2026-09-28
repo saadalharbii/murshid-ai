@@ -8,6 +8,11 @@
 #                    environment variables, and config.py treats it as optional
 #
 # Install the ingestion extras with: pip install -r requirements-dev.txt
-streamlit>=1.40
+
+# Streamlit is pinned because Streamlit Cloud reinstalls on every cold start:
+# an unpinned app picks up each new release unannounced, and releases remove
+# deprecated arguments. 1.64.0 is what the live app ran when this was pinned,
+# and CI tests the same version. Upgrade deliberately, with the tests.
+streamlit==1.64.0
 numpy>=1.26
 certifi>=2024.0

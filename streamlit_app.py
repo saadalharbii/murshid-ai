@@ -218,7 +218,7 @@ def main() -> None:
             "banking and the NHS change over time, and passages carry their "
             "date - verify anything important with your scholarship office."
         )
-        if st.button("Clear conversation", use_container_width=True):
+        if st.button("Clear conversation", width="stretch"):
             st.session_state.messages = []
             st.rerun()
 
@@ -228,7 +228,7 @@ def main() -> None:
         st.write("**Try asking:**")
         columns = st.columns(2)
         for i, example in enumerate(EXAMPLES):
-            if columns[i % 2].button(example, key=f"ex{i}", use_container_width=True):
+            if columns[i % 2].button(example, key=f"ex{i}", width="stretch"):
                 st.session_state.pending = example
                 st.rerun()
 
