@@ -23,6 +23,18 @@ class ClaudeError(RuntimeError):
     """Raised when the Messages API cannot be reached or returns an error."""
 
 
+# Models that answered 400 to a `temperature` setting. Newer models reject it
+# outright, and the model is chosen by environment variable, so the client
+# learns which ones do rather than hardcoding a list that goes stale.
+_REJECTS_TEMPERATURE: set[str] = set()
+
+
+def _rejects_temperature(error: urllib.error.HTTPError) -> bool:
+    try:
+        return error.code == 400 and "temperature" in error.read().decode("utf-8", "replace")
+    except Exception:
+        return False
+
 
 def stream(
     prompt: str,
@@ -36,8 +48,12 @@ def stream(
     if not config.ANTHROPIC_API_KEY:
         raise ClaudeError("ANTHROPIC_API_KEY is not set. Add it to .env.")
 
+    model = model or config.CLAUDE_MODEL
+    if model in _REJECTS_TEMPERATURE:
+        temperature = None
+
     body = {
-        "model": model or config.CLAUDE_MODEL,
+        "model": model,
         "max_tokens": max_tokens,
         "system": system,
         "messages": [{"role": "user", "content": prompt}],
@@ -76,6 +92,13 @@ def stream(
                     if text:
                         yield text
     except urllib.error.HTTPError as exc:
+        if temperature is not None and _rejects_temperature(exc):
+            # Nothing was yielded yet - the status arrives before the stream -
+            # so asking again without it is invisible to the caller. Without
+            # this, the follow-up rewrite failed on every call under Sonnet 5.
+            _REJECTS_TEMPERATURE.add(model)
+            yield from stream(prompt, system, model, max_tokens, timeout)
+            return
         if exc.code == 401:
             raise ClaudeError("The API key was rejected.") from exc
         if exc.code == 429:

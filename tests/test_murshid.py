@@ -600,6 +600,53 @@ class TestTransportFailures:
         with pytest.raises(ClaudeError):
             complete("anything", "system")
 
+    def test_model_that_rejects_temperature_is_asked_again_without(self, monkeypatch):
+        # Sonnet 5 answers 400 to any temperature; the rewrite sends one.
+        import io
+        import urllib.error
+        import urllib.request
+
+        from murshid import claude
+
+        sent = []
+
+        def urlopen(request, **kwargs):
+            body = json.loads(request.data)
+            sent.append(body)
+            if "temperature" in body:
+                message = b'{"error": {"message": "`temperature` is deprecated for this model."}}'
+                raise urllib.error.HTTPError(request.full_url, 400, "Bad", {}, io.BytesIO(message))
+            return io.BytesIO(b'data: {"type": "content_block_delta", "delta": {"text": "ok"}}\n')
+
+        monkeypatch.setattr(urllib.request, "urlopen", urlopen)
+        monkeypatch.setattr(config, "ANTHROPIC_API_KEY", "test")
+        monkeypatch.setattr(claude, "_REJECTS_TEMPERATURE", set())
+
+        assert claude.complete("q", "s", model="new-model", temperature=0.0) == "ok"
+        assert claude.complete("q", "s", model="new-model", temperature=0.0) == "ok"
+        # The second call remembers, instead of paying for a failed request.
+        assert ["temperature" in body for body in sent] == [True, False, False]
+
+    def test_other_bad_requests_are_not_retried(self, monkeypatch):
+        import io
+        import urllib.error
+        import urllib.request
+
+        from murshid.claude import ClaudeError, complete
+
+        calls = []
+
+        def urlopen(request, **kwargs):
+            calls.append(request)
+            message = io.BytesIO(b'{"error": {"message": "prompt is too long"}}')
+            raise urllib.error.HTTPError(request.full_url, 400, "Bad", {}, message)
+
+        monkeypatch.setattr(urllib.request, "urlopen", urlopen)
+        monkeypatch.setattr(config, "ANTHROPIC_API_KEY", "test")
+        with pytest.raises(ClaudeError):
+            complete("q", "s", temperature=0.0)
+        assert len(calls) == 1
+
     def test_unexpected_rewrite_failure_searches_the_question_as_asked(self, monkeypatch):
         from murshid import rag
 
