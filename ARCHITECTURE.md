@@ -54,6 +54,16 @@ as a replacement for Voyage and rejected: the best one that fits Streamlit's
 1 GB (multilingual-e5-small) found relevant passages for 23 of 28 questions,
 6 of 10 in English, and returned spam for questions Voyage answers well.
 
+Past the fallbacks, the page itself is built not to show a traceback. Every
+transport failure - a reset connection, a reply cut off mid-stream, a garbled
+body - is mapped onto the error its fallback handles, and anything unforeseen
+still reaches the visitor as one "try again shortly" line in their language,
+with the traceback in the logs. Deploys are covered too: Streamlit Cloud pulls
+new files into the running process, which once left old package code loaded
+under new app code, so the app re-imports `murshid/` whenever its files
+change. `tests/test_app.py` runs the page against a faked network, with every
+service down or garbled, and reproduces that deploy.
+
 - `murshid/config.py` - settings from environment
 - `murshid/telegram.py` - HTML export parser and conversation-aware chunker
 - `murshid/scrub.py` - redacts contact details at parse time
