@@ -830,7 +830,7 @@ class TestDeployCompatibility:
     """Guard against a redeploy breaking sessions that are already open.
 
     Streamlit keeps Document objects in st.session_state across a redeploy,
-    and @st.cache_resource holds a pipeline keyed on __version__. A field
+    which the app's cache keys and module reload do not reach. A field
     added to Document therefore reaches the renderer as a missing attribute on
     old objects. This crashed the live app once; both halves are tested here.
     """
