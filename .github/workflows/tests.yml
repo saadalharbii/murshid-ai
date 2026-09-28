@@ -1,8 +1,10 @@
 # Runs the offline test suite on every push and pull request.
 #
 # No secrets needed: the tests cover parsing, chunking, retrieval and the
-# outage fallbacks without calling Voyage or Claude. Both ends of the
-# supported Python range are checked, since the README promises 3.10+.
+# outage fallbacks without calling Voyage or Claude, and tests/test_app.py
+# runs the Streamlit page itself against a faked network, so a broken import
+# fails here before it reaches the live demo. 3.10 is the oldest version the
+# README promises; 3.14 is what Streamlit Cloud runs the demo on.
 
 name: tests
 
@@ -15,7 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.10", "3.12"]
+        python-version: ["3.10", "3.12", "3.14"]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
