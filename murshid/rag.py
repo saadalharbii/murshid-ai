@@ -7,10 +7,10 @@ import sys
 import threading
 
 from . import config
-from .claude import ClaudeError, complete, stream
-from .embeddings import EmbeddingError, embed_query
+from .claude import complete, stream
+from .embeddings import embed_query
 from .lexical import KeywordIndex
-from .rerank import RerankError, rerank
+from .rerank import rerank
 from .store import Document, VectorStore
 
 _ARABIC = re.compile(r"[؀-ۿ]")
@@ -120,8 +120,10 @@ def standalone_question(question: str, history: list[tuple[str, str]]) -> str:
         rewritten = complete(
             prompt, _REWRITE_SYSTEM, max_tokens=200, timeout=10.0, temperature=0.0
         )
-    except ClaudeError as exc:
-        print(f"rewrite failed ({exc}); searching the question as asked", file=sys.stderr)
+    except Exception as exc:
+        # Broad on purpose: the rewrite is an enhancement, so no failure in
+        # it - expected or not - should cost the reader their answer.
+        print(f"rewrite failed ({exc!r}); searching the question as asked", file=sys.stderr)
         return question
 
     # The reply should be one question. Anything past the first line is the
@@ -201,7 +203,9 @@ class RAGPipeline:
 
         try:
             query_vector = embed_query(question)
-        except EmbeddingError as exc:
+        except Exception as exc:
+            # EmbeddingError is the expected case, but anything else going
+            # wrong on the way to a vector has the same remedy.
             return language, *self._keyword_fallback(question, exc)
 
         candidates = self.store.search(
@@ -216,14 +220,14 @@ class RAGPipeline:
         return language, self._rerank(question, candidates), None
 
     def _keyword_fallback(
-        self, question: str, cause: EmbeddingError
+        self, question: str, cause: Exception
     ) -> tuple[list[Document], str | None]:
         """Retrieve by keywords when the embedding service is unavailable.
 
         Reranking is skipped: it runs on the same service that just failed,
         so trying it would only add the reader's wait to the outage.
         """
-        print(f"embedding failed ({cause}); falling back to keyword search", file=sys.stderr)
+        print(f"embedding failed ({cause!r}); falling back to keyword search", file=sys.stderr)
         # A wider net than vector search gets: keywords match people asking
         # the question as readily as people answering it, and the passages
         # are short enough that ten cost Claude little more than five.
@@ -243,8 +247,10 @@ class RAGPipeline:
                 [doc.content for doc in candidates],
                 top_n=config.TOP_K_RESULTS,
             )
-        except RerankError:
-            # Fall back to vector order rather than failing the query.
+        except Exception as exc:
+            # Fall back to vector order rather than failing the query. Broad
+            # for the same reason as the rewrite: reranking is optional.
+            print(f"rerank failed ({exc!r}); using vector order", file=sys.stderr)
             return candidates[: config.TOP_K_RESULTS]
 
         sources = []

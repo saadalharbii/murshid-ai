@@ -16,7 +16,7 @@ from __future__ import annotations
 import urllib.error
 
 from . import config
-from ._http import post_json
+from ._http import TRANSPORT_ERRORS, post_json
 
 _API_URL = "https://api.voyageai.com/v1/rerank"
 _MAX_DOC_CHARS = 1500
@@ -59,7 +59,15 @@ def rerank(query: str, documents: list[str], top_n: int, timeout: float = 10.0) 
         )
     except urllib.error.HTTPError as exc:
         raise RerankError(f"Voyage rerank returned {exc.code}") from exc
-    except (urllib.error.URLError, TimeoutError) as exc:
+    except TRANSPORT_ERRORS as exc:
         raise RerankError("Could not reach the rerank service.") from exc
 
-    return [(item["index"], item["relevance_score"]) for item in body["data"]]
+    # The caller indexes its candidate list with these, so a malformed reply
+    # is rejected here rather than surfacing as an IndexError mid-answer.
+    try:
+        ranked = [(int(item["index"]), float(item["relevance_score"])) for item in body["data"]]
+    except (KeyError, TypeError, ValueError) as exc:
+        raise RerankError("Rerank returned an unexpected response.") from exc
+    if any(not 0 <= index < len(documents) for index, _ in ranked):
+        raise RerankError("Rerank returned an index out of range.")
+    return ranked

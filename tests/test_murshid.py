@@ -6,7 +6,10 @@ calls are exercised by running the app.
 
 from __future__ import annotations
 
+import http.client
+import json
 import re
+import ssl
 import sys
 from pathlib import Path
 
@@ -211,7 +214,7 @@ class TestRerankFallback:
         return rag.RAGPipeline(store=store)
 
     def test_falls_back_to_vector_order_when_rerank_fails(self, monkeypatch):
-        from murshid.rag import RerankError
+        from murshid.rerank import RerankError
 
         def failing(*args, **kwargs):
             raise RerankError("service down")
@@ -478,6 +481,134 @@ class TestRetryBudget:
         with pytest.raises(EmbeddingError):
             embed_documents(["a"])
         assert sum(rate_limited) >= 60
+
+
+class TestTransportFailures:
+    """Every way a request can fail maps onto the error its caller handles.
+
+    Only refused connections and timeouts were mapped once. A connection
+    reset, a reply cut off partway or a garbled body escaped as a raw
+    exception, skipping the fallbacks and showing a visitor a traceback.
+    """
+
+    @pytest.fixture
+    def network(self, monkeypatch):
+        """Make every request fail with whatever the test assigns."""
+        import urllib.request
+
+        from murshid import _http
+
+        failure: list[Exception] = []
+
+        def urlopen(request, **kwargs):
+            raise failure[0]
+
+        monkeypatch.setattr(urllib.request, "urlopen", urlopen)
+        monkeypatch.setattr(_http.time, "sleep", lambda _: None)
+        monkeypatch.setattr(config, "VOYAGE_API_KEY", "test")
+        monkeypatch.setattr(config, "ANTHROPIC_API_KEY", "test")
+        return failure
+
+    FAILURES = [
+        ConnectionResetError("reset by peer"),
+        TimeoutError("timed out"),
+        ssl.SSLError("bad record mac"),
+        http.client.IncompleteRead(b"partial"),
+        http.client.RemoteDisconnected("closed"),
+        json.JSONDecodeError("Expecting value", "<html>", 0),
+    ]
+
+    @pytest.mark.parametrize("failure", FAILURES, ids=lambda e: type(e).__name__)
+    def test_embedding(self, network, failure):
+        from murshid.embeddings import EmbeddingError, embed_query
+
+        network.append(failure)
+        with pytest.raises(EmbeddingError):
+            embed_query("anything")
+
+    @pytest.mark.parametrize("failure", FAILURES, ids=lambda e: type(e).__name__)
+    def test_rerank(self, network, failure):
+        from murshid.rerank import RerankError, rerank
+
+        network.append(failure)
+        with pytest.raises(RerankError):
+            rerank("anything", ["a", "b"], top_n=1)
+
+    @pytest.mark.parametrize("failure", FAILURES, ids=lambda e: type(e).__name__)
+    def test_generation(self, network, failure):
+        from murshid.claude import ClaudeError, complete
+
+        network.append(failure)
+        with pytest.raises(ClaudeError):
+            complete("anything", "system")
+
+    def _replying(self, monkeypatch, body: bytes):
+        import io
+        import urllib.request
+
+        monkeypatch.setattr(urllib.request, "urlopen", lambda *a, **k: io.BytesIO(body))
+        monkeypatch.setattr(config, "VOYAGE_API_KEY", "test")
+        monkeypatch.setattr(config, "ANTHROPIC_API_KEY", "test")
+
+    def test_embedding_reply_of_the_wrong_shape(self, monkeypatch):
+        from murshid.embeddings import EmbeddingError, embed_query
+
+        self._replying(monkeypatch, b'{"data": []}')
+        with pytest.raises(EmbeddingError):
+            embed_query("anything")
+
+    def test_rerank_index_out_of_range(self, monkeypatch):
+        # The caller indexes its candidate list with these numbers.
+        from murshid.rerank import RerankError, rerank
+
+        self._replying(monkeypatch, b'{"data": [{"index": 7, "relevance_score": 0.9}]}')
+        with pytest.raises(RerankError):
+            rerank("anything", ["a", "b"], top_n=1)
+
+    def test_stream_dropped_mid_reply(self, monkeypatch):
+        import urllib.request
+
+        from murshid.claude import ClaudeError, stream
+
+        class Dropping:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *exc):
+                return False
+
+            def __iter__(self):
+                yield b'data: {"type": "content_block_delta", "delta": {"text": "Hi"}}'
+                raise http.client.IncompleteRead(b"")
+
+        monkeypatch.setattr(urllib.request, "urlopen", lambda *a, **k: Dropping())
+        monkeypatch.setattr(config, "ANTHROPIC_API_KEY", "test")
+
+        reply = stream("anything", "system")
+        assert next(reply) == "Hi"
+        with pytest.raises(ClaudeError):
+            next(reply)
+
+    def test_error_event_inside_a_stream(self, monkeypatch):
+        # Overload arrives as an event in a 200 response, not as a status.
+        from murshid.claude import ClaudeError, complete
+
+        self._replying(
+            monkeypatch,
+            b'data: {"type": "error", "error": {"type": "overloaded_error"}}\n',
+        )
+        with pytest.raises(ClaudeError):
+            complete("anything", "system")
+
+    def test_unexpected_rewrite_failure_searches_the_question_as_asked(self, monkeypatch):
+        from murshid import rag
+
+        def broken(*args, **kwargs):
+            raise KeyError("not a ClaudeError")
+
+        monkeypatch.setattr(rag, "complete", broken)
+        history = [("How much is rent in London?", "About £900.")]
+        assert rag.standalone_question("and Leeds?", history) == "and Leeds?"
 
 
 class TestRefusalDetection:

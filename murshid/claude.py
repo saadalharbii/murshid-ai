@@ -13,7 +13,7 @@ import urllib.error
 import urllib.request
 
 from . import config
-from ._http import ssl_context
+from ._http import TRANSPORT_ERRORS, ssl_context
 
 _API_URL = "https://api.anthropic.com/v1/messages"
 _API_VERSION = "2023-06-01"
@@ -64,8 +64,15 @@ def stream(
                 if not line.startswith("data:"):
                     continue
                 event = json.loads(line[5:].strip())
+                if not isinstance(event, dict):
+                    continue
+                if event.get("type") == "error":
+                    # Overload and similar failures arrive as an event inside
+                    # a 200 response, so ignoring them ended the reply early
+                    # and silently.
+                    raise ClaudeError("The language model is busy. Please try again.")
                 if event.get("type") == "content_block_delta":
-                    text = event.get("delta", {}).get("text")
+                    text = (event.get("delta") or {}).get("text")
                     if text:
                         yield text
     except urllib.error.HTTPError as exc:
@@ -76,7 +83,9 @@ def stream(
         raise ClaudeError(
             f"The language model returned an error ({exc.code}). Please try again."
         ) from exc
-    except (urllib.error.URLError, TimeoutError) as exc:
+    except TRANSPORT_ERRORS as exc:
+        # Includes a connection dropped mid-reply and a garbled event, which
+        # escaped as raw exceptions before and skipped every fallback.
         raise ClaudeError("Could not reach the language model.") from exc
 
 

@@ -7,6 +7,7 @@ keeps the deployed dependency set small enough for Streamlit Cloud.
 
 from __future__ import annotations
 
+import http.client
 import json
 import ssl
 import time
@@ -14,6 +15,13 @@ import urllib.error
 import urllib.request
 
 _ssl_singleton: ssl.SSLContext | None = None
+
+# Every way a request can fail after it is sent, short of an HTTP error status.
+# URLError, TimeoutError, ConnectionResetError and ssl.SSLError are all
+# OSErrors; a response cut off partway raises http.client.IncompleteRead; and
+# garbled JSON raises ValueError. Catching only URLError and TimeoutError let a
+# dropped connection escape as a traceback instead of reaching the fallbacks.
+TRANSPORT_ERRORS = (OSError, http.client.HTTPException, ValueError)
 
 
 def ssl_context() -> ssl.SSLContext:
@@ -53,6 +61,11 @@ def post_json(
     Retries 429 (rate limit) and 5xx (server fault); both mean the request
     itself was fine. Raises urllib.error.HTTPError for anything else so callers
     can map status codes onto their own error types.
+
+    Everything else that can go wrong in transit is retried too, then raised
+    as-is for the caller to map: OSError covers refused and reset connections,
+    timeouts and TLS failures; HTTPException a connection dropped mid-response;
+    ValueError a body that is not the JSON it should be.
     """
     request = urllib.request.Request(
         url,
@@ -72,7 +85,7 @@ def post_json(
                 time.sleep(retry_delay * (attempt + 1))
                 continue
             raise
-        except (urllib.error.URLError, TimeoutError):
+        except TRANSPORT_ERRORS:
             if attempt < attempts - 1:
                 time.sleep(retry_delay * (attempt + 1))
                 continue

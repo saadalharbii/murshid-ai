@@ -11,7 +11,7 @@ from __future__ import annotations
 import urllib.error
 
 from . import config
-from ._http import post_json
+from ._http import TRANSPORT_ERRORS, post_json
 
 _API_URL = "https://api.voyageai.com/v1/embeddings"
 
@@ -61,10 +61,16 @@ def _post(
         # act on "search is unavailable", not on a provider's name or an HTTP
         # status. The status is kept on the chained exception for the logs.
         raise EmbeddingError("Search is unavailable right now.") from exc
-    except (urllib.error.URLError, TimeoutError) as exc:
+    except TRANSPORT_ERRORS as exc:
         raise EmbeddingError("Could not reach the search service.") from exc
 
-    return [item["embedding"] for item in body["data"]]
+    try:
+        vectors = [item["embedding"] for item in body["data"]]
+    except (KeyError, TypeError) as exc:
+        raise EmbeddingError("Search returned an unexpected response.") from exc
+    if len(vectors) != len(texts):
+        raise EmbeddingError("Search returned an unexpected response.")
+    return vectors
 
 
 def embed_query(text: str, timeout: float = 10.0) -> list[float]:
