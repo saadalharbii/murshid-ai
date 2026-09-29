@@ -57,6 +57,7 @@ Thumbs.db
 
 # Telegram export - contacts contain personal data, never commit
 ChatExport_*/contacts/
+data/telegram_sample/contacts/
 
 # Local virtualenv
 .venv/

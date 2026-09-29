@@ -23,7 +23,7 @@ from murshid.scrub import contains_contact_details
 from murshid.store import VectorStore
 from murshid.telegram import TelegramParser
 
-DEFAULT_EXPORT = Path(__file__).parent / "ChatExport_2025-10-26"
+DEFAULT_EXPORT = Path(__file__).parent / "data" / "telegram_sample"
 
 
 def corpus_fingerprint(contents: list[str]) -> str:
