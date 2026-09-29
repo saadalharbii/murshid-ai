@@ -8,8 +8,8 @@ code.
 
 MurshidAI is a bilingual (Arabic/English) RAG chatbot answering questions about
 studying in the UK, grounded in an archive of Saudi scholarship student
-Telegram discussions. It is a portfolio project: the priority is that it runs
-reliably with no maintenance, not that it has many features.
+Telegram discussions. The design priority is that it runs unattended, with
+nothing to restart or renew, ahead of adding features.
 
 ## Architecture
 
@@ -86,25 +86,21 @@ python ingest.py                  # rebuild the index (only after data changes)
 python -m pytest tests/ -q        # run tests
 ```
 
-## Two virtualenvs
+## Design constraints
 
-`.venv-app/` (anthropic-free, ~50MB) is what the app runs on and what deploys.
-`.venv/` additionally has torch and sentence-transformers and is left over from
-the previous implementation; do not use it. Imports hang inside it because it
-has both `httpx` and `httpx2` installed.
-
-## Conventions
-
-- **Both API clients use `urllib`, not `requests` or the Anthropic SDK.** The
-  SDK's httpx2 stack hangs indefinitely on this machine. Keep using urllib with
-  the certifi CA bundle - plain `ssl.create_default_context()` fails with
-  CERTIFICATE_VERIFY_FAILED on this Python install.
-- **Never add torch or sentence-transformers to `requirements.txt`.** Streamlit
-  Community Cloud caps memory at 1GB; the deployed app must stay small.
+- **The API clients use `urllib`, not the vendor SDKs.** During development the
+  Anthropic SDK's HTTP stack hung indefinitely on some macOS Python installs,
+  and urllib keeps the deployed app to three dependencies. Requests use
+  certifi's CA bundle, because python.org builds on macOS cannot always read
+  the system trust store.
+- **No torch or sentence-transformers in `requirements.txt`.** Streamlit
+  Community Cloud caps memory at 1GB, and every runtime dependency is
+  reinstalled on each cold start.
 - **`data/index.npz` is committed on purpose.** It is the reason the demo has
-  no external dependencies. Rebuild and re-commit it when the corpus changes.
-- Voyage's free tier allows 3 requests/minute, so `ingest.py` rate-limits and
-  checkpoints; a re-run resumes rather than restarting.
+  no database to keep alive. Rebuild and re-commit it when the corpus changes.
+- **Ingestion checkpoints after every batch**, so an interrupted run resumes
+  rather than restarting. Rate limits are waited out when the API answers 429
+  instead of throttling every batch in advance.
 
 ## Ingestion
 
@@ -124,8 +120,8 @@ exist because of measurement rather than taste:
 
 ## Data and privacy
 
-`ChatExport_2025-10-26/` holds 67 export files sampled evenly across 2017-2025.
-Contact details are redacted at parse time (see Ingestion above), so the index
-and the app never carry them. A `contacts/` directory of vcards with
-real names and phone numbers was removed in commit 2ddca47 and is gitignored -
-do not reintroduce it. Note that it remains present in commits before 2ddca47.
+`data/telegram_sample/` holds 67 pages of a Telegram HTML export, sampled
+evenly across 2017-2025; only the message pages are kept, since the parser
+reads nothing else. Contact details are redacted at parse time (see Ingestion
+above), and `ingest.py` refuses to build an index that still contains any, so
+neither the index nor the app carries them.
